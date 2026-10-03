@@ -27,12 +27,16 @@ export function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) 
   return (
     <main className="login">
       <section className="login-panel" aria-labelledby="login-title">
-        <p className="login-brand">Gestion boutique</p>
+        <div className="login-brand-row">
+          <p className="login-brand">Gestion boutique</p>
+          <span className="login-label">ESPACE DE GESTION</span>
+        </div>
+        <p className="login-overline">Accès sécurisé</p>
         <h1 id="login-title">Connexion</h1>
-        <p className="login-intro">Identifiez-vous pour accéder à votre espace.</p>
+        <p className="login-intro">Saisissez les informations associées à votre compte.</p>
         <form onSubmit={submit} noValidate>
           <Field
-            label="Identifiant"
+            label="Nom d’utilisateur"
             autoComplete="username"
             {...form.register('identifiant')}
             error={form.formState.errors.identifiant?.message}
@@ -53,7 +57,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) 
             {busy ? 'Connexion…' : 'Se connecter'}
           </Button>
         </form>
-        <p className="login-footnote">Accès réservé aux utilisateurs autorisés.</p>
+        <p className="login-footnote">Accès réservé au personnel de la boutique.</p>
       </section>
     </main>
   );

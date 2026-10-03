@@ -1,11 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
-import { Heading } from '../components/layout';
+import { Heading, Pager } from '../components/layout';
 import { Receipt } from '../components/Receipt';
-import { Button, EmptyState, ErrorState, Field, LoadingState, Modal } from '../components/ui';
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  Field,
+  LoadingState,
+  Modal,
+  SelectField,
+} from '../components/ui';
 import { apiErrorMessage, applyApiFieldErrors } from '../forms';
 import { clientSchema, purchaseSchema, type PurchaseValues } from '../schemas/forms';
 import type { Client, ClientRequest, Product, Ticket } from '../types';
@@ -15,19 +29,23 @@ export function CheckoutPage() {
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
   const [search, setSearch] = useState('');
+  const [productPage, setProductPage] = useState(0);
+  const [productPageSize, setProductPageSize] = useState(5);
   const [clientSearch, setClientSearch] = useState('');
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Record<string, Product>>({});
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [message, setMessage] = useState('');
   const [clientModal, setClientModal] = useState(false);
   const productsQuery = useQuery({
-    queryKey: ['products', 'checkout', search],
-    queryFn: () => api.products(0, search, 100),
+    queryKey: ['products', 'checkout', search, productPage, productPageSize],
+    queryFn: () => api.products(productPage, search, productPageSize),
   });
   const clientsQuery = useQuery({
     queryKey: ['clients', clientSearch],
     queryFn: () => api.clients(clientSearch),
+    enabled: clientPickerOpen && !selectedClient,
   });
   const form = useForm<PurchaseValues>({
     resolver: zodResolver(purchaseSchema),
@@ -73,6 +91,7 @@ export function CheckoutPage() {
       setSelectedClient(client);
       form.setValue('clientId', client.id);
       setClientSearch(`${client.prenom || ''} ${client.nom}`.trim());
+      setClientPickerOpen(false);
       setClientModal(false);
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       clientCreate.reset();
@@ -89,6 +108,33 @@ export function CheckoutPage() {
       });
     } else {
       lines.append({ produitId: product.id, quantite: 1 });
+    }
+  }
+
+  function selectClient(client: Client) {
+    setSelectedClient(client);
+    form.setValue('clientId', client.id, { shouldValidate: true });
+    setClientSearch(`${client.prenom || ''} ${client.nom}`.trim());
+    setClientPickerOpen(false);
+  }
+
+  function handleClientKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    const options = document.querySelectorAll<HTMLButtonElement>('#client-options button');
+    if (event.key === 'ArrowDown' && options.length > 0) {
+      event.preventDefault();
+      options.item(0)?.focus();
+    }
+    if (event.key === 'Enter' && clientPickerOpen && !selectedClient) {
+      event.preventDefault();
+      const firstClient = clientsQuery.data?.content[0];
+      if (firstClient) {
+        selectClient(firstClient);
+      } else if (clientSearch.trim() && clientsQuery.isSuccess) {
+        setClientModal(true);
+      }
+    }
+    if (event.key === 'Escape') {
+      setClientPickerOpen(false);
     }
   }
 
@@ -169,7 +215,10 @@ export function CheckoutPage() {
               id="product-search"
               name="product-search"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setProductPage(0);
+              }}
               placeholder="Nom du produit… (F2)"
               autoComplete="off"
             />
@@ -198,6 +247,31 @@ export function CheckoutPage() {
             ) : (
               <EmptyState>Aucun produit trouvé dans le rayon.</EmptyState>
             )}
+            {productsQuery.data && (
+              <div className="checkout-product-pagination">
+                <div className="checkout-page-size">
+                  <SelectField
+                    label="Produits par page"
+                    name="checkout-page-size"
+                    onChange={(event) => {
+                      setProductPageSize(Number(event.target.value));
+                      setProductPage(0);
+                    }}
+                    value={productPageSize}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </SelectField>
+                </div>
+                <Pager
+                  page={productPage}
+                  pages={productsQuery.data.totalPages}
+                  setPage={setProductPage}
+                />
+              </div>
+            )}
           </section>
 
           <section className="basket">
@@ -208,6 +282,10 @@ export function CheckoutPage() {
             <h2>À régler</h2>
             <div className="customer-picker">
               <Field
+                aria-autocomplete="list"
+                aria-controls={clientPickerOpen ? 'client-options' : undefined}
+                aria-expanded={clientPickerOpen && !selectedClient}
+                aria-haspopup="listbox"
                 label="Client (facultatif)"
                 name="client-search"
                 value={clientSearch}
@@ -215,37 +293,93 @@ export function CheckoutPage() {
                   setClientSearch(event.target.value);
                   setSelectedClient(null);
                   form.setValue('clientId', null);
+                  setClientPickerOpen(true);
                 }}
-                placeholder="Client comptoir"
+                onFocus={() => setClientPickerOpen(true)}
+                onKeyDown={handleClientKeyDown}
+                placeholder="Chercher un client par nom"
                 autoComplete="off"
               />
-              {clientSearch &&
-                !selectedClient &&
-                clientsQuery.data?.content.map((client) => (
+              {clientPickerOpen && !selectedClient && (
+                <>
+                  {clientsQuery.isLoading ? (
+                    <p className="supplier-search-status" role="status">
+                      Recherche des clients…
+                    </p>
+                  ) : clientsQuery.isError ? (
+                    <div className="supplier-search-error">
+                      <ErrorState error={clientsQuery.error} />
+                      <Button onClick={() => clientsQuery.refetch()} type="button">
+                        Réessayer
+                      </Button>
+                    </div>
+                  ) : clientsQuery.data?.content.length ? (
+                    <div
+                      className="supplier-options"
+                      id="client-options"
+                      role="listbox"
+                      aria-label="Clients correspondants"
+                    >
+                      {clientsQuery.data.content.slice(0, 8).map((client) => (
+                        <button
+                          aria-selected="false"
+                          className="suggestion"
+                          key={client.id}
+                          onClick={() => selectClient(client)}
+                          role="option"
+                          type="button"
+                        >
+                          <span>{[client.prenom, client.nom].filter(Boolean).join(' ')}</span>
+                          <small>{client.telephone || 'Téléphone non renseigné'}</small>
+                        </button>
+                      ))}
+                    </div>
+                  ) : clientSearch.trim() && clientsQuery.isSuccess ? (
+                    <div className="supplier-no-results" role="status">
+                      <span>Aucun client ne correspond à cette recherche.</span>
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() => setClientModal(true)}
+                      >
+                        Créer cette fiche client
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="supplier-search-status" role="status">
+                      Aucun client enregistré.
+                    </p>
+                  )}
+                </>
+              )}
+              {selectedClient && (
+                <p className="supplier-selected" role="status">
+                  Client sélectionné : {selectedClient.prenom} {selectedClient.nom}
                   <button
-                    key={client.id}
-                    className="suggestion"
+                    className="text-button"
                     type="button"
                     onClick={() => {
-                      setSelectedClient(client);
-                      form.setValue('clientId', client.id);
-                      setClientSearch(`${client.prenom || ''} ${client.nom}`.trim());
+                      setSelectedClient(null);
+                      setClientSearch('');
+                      form.setValue('clientId', null);
+                      setClientPickerOpen(true);
                     }}
                   >
-                    {client.prenom} {client.nom} <small>{client.telephone}</small>
+                    Changer
                   </button>
-                ))}
-              {clientSearch &&
-                !clientsQuery.isLoading &&
-                clientsQuery.data?.content.length === 0 && (
                   <button
-                    type="button"
                     className="text-button"
-                    onClick={() => setClientModal(true)}
+                    type="button"
+                    onClick={() => {
+                      setSelectedClient(null);
+                      setClientSearch('');
+                      form.setValue('clientId', null);
+                    }}
                   >
-                    Créer cette fiche client +
+                    Vente sans client
                   </button>
-                )}
+                </p>
+              )}
               {form.formState.errors.clientId?.message && (
                 <p className="field-error" role="alert">
                   {form.formState.errors.clientId.message}

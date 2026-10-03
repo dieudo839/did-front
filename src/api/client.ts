@@ -46,7 +46,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     if (path === '/api/auth/login') {
       const body = (await response.json().catch(() => ({}))) as ApiErrorBody;
       throw new ApiError(
-        body.message || body.detail || 'Identifiant ou mot de passe incorrect.',
+        body.message || body.detail || 'Nom d’utilisateur ou mot de passe incorrect.',
         response.status,
       );
     }
@@ -62,7 +62,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as ApiErrorBody;
     throw new ApiError(
-      body.message || `La requête a échoué (${response.status}).`,
+      body.message || body.detail || `La requête a échoué (${response.status}).`,
       response.status,
       body.errors || {},
     );

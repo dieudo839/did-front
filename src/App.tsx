@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SESSION_KEY, readSession } from './api/client';
 import { Shell } from './components/layout';
 import { CheckoutPage } from './pages/CheckoutPage';
+import { ClientsPage } from './pages/ClientsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DeliveriesPage } from './pages/DeliveriesPage';
 import { HistoryPage } from './pages/HistoryPage';
@@ -55,7 +56,11 @@ function App() {
                   element={<ProductsPage role={session.utilisateur.role} />}
                 />
                 <Route path="/caisse" element={<CheckoutPage />} />
-                <Route path="/arrivages" element={<DeliveriesPage />} />
+                <Route path="/clients" element={<ClientsPage />} />
+                <Route
+                  path="/arrivages"
+                  element={<DeliveriesPage role={session.utilisateur.role} />}
+                />
                 <Route path="/ventes" element={<HistoryPage />} />
                 <Route path="/profil" element={<ProfilePage />} />
                 <Route

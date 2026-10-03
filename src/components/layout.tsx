@@ -7,6 +7,7 @@ const navigation = [
   ['/', 'Tableau de bord'],
   ['/produits', 'Produits'],
   ['/caisse', 'Caisse'],
+  ['/clients', 'Clients'],
   ['/arrivages', 'Livraisons'],
   ['/ventes', 'Historique'],
 ];
@@ -129,6 +130,18 @@ export function Pager({
     return null;
   }
 
+  const visiblePages = new Set([0, pages - 1, page - 1, page, page + 1]);
+  const pageNumbers = [...visiblePages]
+    .filter((number) => number >= 0 && number < pages)
+    .sort((first, second) => first - second);
+  const items: Array<number | 'ellipsis'> = [];
+  pageNumbers.forEach((number, index) => {
+    if (index > 0 && number - pageNumbers[index - 1] > 1) {
+      items.push('ellipsis');
+    }
+    items.push(number);
+  });
+
   return (
     <nav className="pager" aria-label="Pagination">
       <button
@@ -139,8 +152,28 @@ export function Pager({
       >
         Précédent
       </button>
-      <span className="mono" aria-live="polite">
-        {page + 1} / {pages}
+      <div className="pager-pages" aria-label="Pages">
+        {items.map((item, index) =>
+          item === 'ellipsis' ? (
+            <span className="pager-ellipsis" key={`ellipsis-${index}`} aria-hidden="true">
+              …
+            </span>
+          ) : (
+            <button
+              aria-current={item === page ? 'page' : undefined}
+              aria-label={`Page ${item + 1}`}
+              className={`pager-page ${item === page ? 'pager-page-active' : ''}`}
+              key={item}
+              onClick={() => setPage(item)}
+              type="button"
+            >
+              {item + 1}
+            </button>
+          ),
+        )}
+      </div>
+      <span className="pager-count mono" aria-live="polite">
+        Page {page + 1} sur {pages}
       </span>
       <button
         className="button"

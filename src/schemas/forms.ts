@@ -9,7 +9,7 @@ const positiveQuantity = z
   .positive('La quantité doit être supérieure à zéro.');
 
 export const loginSchema = z.object({
-  identifiant: z.string().trim().min(1, 'Saisissez votre identifiant.'),
+  identifiant: z.string().trim().min(1, 'Saisissez votre nom d’utilisateur.'),
   motDePasse: z.string().min(1, 'Saisissez votre mot de passe.'),
 });
 
@@ -19,7 +19,6 @@ export const productSchema = z.object({
   prixVente: positiveAmount,
   stockActuel: z.number().int().min(0, 'Le stock ne peut pas être négatif.'),
   seuilAlerte: z.number().int().min(0, 'Le seuil ne peut pas être négatif.'),
-  categorieId: uuid.nullable(),
 });
 
 export const userSchema = z.object({
@@ -32,7 +31,7 @@ export const userSchema = z.object({
     .min(1, 'Saisissez la date de naissance.')
     .refine((value) => !Number.isNaN(Date.parse(value)), 'Date invalide.')
     .refine((value) => new Date(value) < new Date(), 'La date doit être passée.'),
-  identifiant: z.string().trim().min(1, 'Saisissez un identifiant.').max(50),
+  identifiant: z.string().trim().min(1, 'Saisissez un nom d’utilisateur.').max(50),
   motDePasse: z.string().min(8, '8 caractères minimum.'),
   role: z.enum(['ADMIN', 'VENDEUR']),
   actif: z.boolean(),

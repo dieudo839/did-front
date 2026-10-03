@@ -25,8 +25,6 @@ export interface Product {
   prixVente: number;
   stockActuel: number;
   seuilAlerte: number;
-  categorieId: string | null;
-  categorie: string | null;
 }
 
 export interface Page<T> {
@@ -42,6 +40,7 @@ export interface Client {
   nom: string;
   prenom: string | null;
   telephone: string | null;
+  nombreAchats: number;
 }
 
 export interface Grossiste {
@@ -119,7 +118,6 @@ export interface ProductRequest {
   prixVente: number;
   stockActuel: number;
   seuilAlerte: number;
-  categorieId: string | null;
 }
 
 export interface UserRequest {

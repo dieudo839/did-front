@@ -1,269 +1,410 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
-import { DataTable, EmptyState, ErrorState, LoadingState, Tag } from '../components/ui';
-import { Heading } from '../components/layout';
-import type { Purchase } from '../types';
-import { money } from '../utils';
+import { ApiError, readSession } from '../api/client';
+import { ActiviteRecente } from './dashboard/ActiviteRecente';
+import { ClassementProduits } from './dashboard/ClassementProduits';
+import { ComptesInactifs } from './dashboard/ComptesInactifs';
+import { EnteteDePage } from './dashboard/EnteteDePage';
+import { GraphiqueCA, rangeDescription } from './dashboard/GraphiqueCA';
+import { IndicateurCle } from './dashboard/IndicateurCle';
+import { ListeAlertesStock } from './dashboard/ListeAlertesStock';
+import { SectionTitre } from './dashboard/SectionTitre';
+import {
+  countItems,
+  rankProducts,
+  sumPurchases,
+  toActivity,
+  toDayTotals,
+  type DashboardPeriod,
+  type DateRange,
+} from './dashboard/types';
 
-const chartWidth = 640;
-const chartHeight = 240;
-const chartPadding = { top: 24, right: 20, bottom: 42, left: 76 };
-
-function dateOnly(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function formatDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')}`;
 }
 
-function recentDates() {
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    date.setDate(date.getDate() - (6 - index));
-    return date;
-  });
+function parseDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year!, month! - 1, day!);
 }
 
-async function recentPurchases(startDate: string, endDate: string) {
-  const filters = { dateDebut: startDate, dateFin: endDate };
-  const firstPage = await api.purchases(0, filters);
-  const purchases = [...firstPage.content];
+function dateRange(start: Date, end: Date): DateRange {
+  return { start: formatDate(start), end: formatDate(end) };
+}
 
-  for (let page = 1; page < firstPage.totalPages; page += 5) {
-    const pageNumbers = Array.from(
-      { length: Math.min(5, firstPage.totalPages - page) },
-      (_, index) => page + index,
+function getRanges(period: DashboardPeriod, today = new Date()) {
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  let start: Date;
+  let previousStart: Date;
+  let previousEnd: Date;
+
+  if (period === 'today') {
+    start = end;
+    previousEnd = new Date(end);
+    previousEnd.setDate(previousEnd.getDate() - 1);
+    previousStart = new Date(previousEnd);
+  } else if (period === '7days' || period === '30days') {
+    const days = period === '7days' ? 7 : 30;
+    start = new Date(end);
+    start.setDate(start.getDate() - days + 1);
+    previousEnd = new Date(start);
+    previousEnd.setDate(previousEnd.getDate() - 1);
+    previousStart = new Date(previousEnd);
+    previousStart.setDate(previousStart.getDate() - days + 1);
+  } else {
+    start = new Date(end.getFullYear(), end.getMonth(), 1);
+    previousStart = new Date(end.getFullYear(), end.getMonth() - 1, 1);
+    previousEnd = new Date(
+      end.getFullYear(),
+      end.getMonth() - 1,
+      Math.min(end.getDate(), new Date(end.getFullYear(), end.getMonth(), 0).getDate()),
     );
-    const nextPages = await Promise.all(
-      pageNumbers.map((number) => api.purchases(number, filters)),
+  }
+
+  return {
+    current: dateRange(start, end),
+    previous: dateRange(previousStart, previousEnd),
+  };
+}
+
+function inclusiveDates(range: DateRange) {
+  const start = parseDate(range.start);
+  const end = parseDate(range.end);
+  const dates: string[] = [];
+  for (const date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+    dates.push(formatDate(date));
+  }
+  return dates;
+}
+
+async function fetchAllPurchases(range: DateRange) {
+  const filters = { dateDebut: range.start, dateFin: range.end };
+  const first = await api.purchases(0, filters);
+  const purchases = [...first.content];
+
+  for (let firstPage = 1; firstPage < first.totalPages; firstPage += 5) {
+    const pages = Array.from(
+      { length: Math.min(5, first.totalPages - firstPage) },
+      (_, index) => firstPage + index,
     );
-    nextPages.forEach((result) => purchases.push(...result.content));
+    const results = await Promise.all(pages.map((page) => api.purchases(page, filters)));
+    results.forEach((result) => purchases.push(...result.content));
   }
 
   return purchases;
 }
 
-function RevenueChart({ purchases, dates }: { purchases: Purchase[]; dates: Date[] }) {
-  const totals = useMemo(() => {
-    const result = new Map(dates.map((date) => [dateOnly(date), 0]));
-    purchases.forEach((purchase) => {
-      const day = purchase.dateAchat.slice(0, 10);
-      if (result.has(day)) {
-        result.set(day, (result.get(day) || 0) + purchase.total);
-      }
-    });
-    return dates.map((date) => ({ date, total: result.get(dateOnly(date)) || 0 }));
-  }, [dates, purchases]);
-  const maxValue = Math.max(...totals.map((entry) => entry.total), 1);
-  const plotWidth = chartWidth - chartPadding.left - chartPadding.right;
-  const plotHeight = chartHeight - chartPadding.top - chartPadding.bottom;
-  const points = totals.map((entry, index) => ({
-    x: chartPadding.left + (plotWidth * index) / Math.max(totals.length - 1, 1),
-    y: chartPadding.top + plotHeight - (entry.total / maxValue) * plotHeight,
-    ...entry,
-  }));
-  const path = points
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-    .join(' ');
-  const formatter = new Intl.NumberFormat('fr-FR', {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  });
-  const totalPeriod = totals.reduce((sum, entry) => sum + entry.total, 0);
+async function fetchInactiveUsers() {
+  const first = await api.users(0);
+  const users = [...first.content];
+  for (let firstPage = 1; firstPage < first.totalPages; firstPage += 5) {
+    const pages = Array.from(
+      { length: Math.min(5, first.totalPages - firstPage) },
+      (_, index) => firstPage + index,
+    );
+    const results = await Promise.all(pages.map((page) => api.users(page)));
+    results.forEach((result) => users.push(...result.content));
+  }
+  return users.filter((user) => !user.actif).length;
+}
 
-  return (
-    <section className="dashboard-chart" aria-labelledby="revenue-chart-title">
-      <div className="dashboard-section-heading">
-        <div>
-          <p className="eyebrow">Activité récente</p>
-          <h2 id="revenue-chart-title">Chiffre d’affaires · 7 jours</h2>
-        </div>
-        <strong className="dashboard-chart-total">{money(totalPeriod)}</strong>
-      </div>
-      <div className="chart-wrap">
-        <svg
-          className="revenue-chart"
-          role="img"
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          aria-labelledby="revenue-chart-title revenue-chart-description"
-        >
-          <desc id="revenue-chart-description">
-            Chiffre d’affaires quotidien calculé à partir des ventes enregistrées.
-          </desc>
-          {[0, 0.5, 1].map((fraction) => {
-            const y = chartPadding.top + plotHeight * fraction;
-            const value = maxValue * (1 - fraction);
-            return (
-              <g className="chart-axis" key={fraction}>
-                <line x1={chartPadding.left} x2={chartWidth - chartPadding.right} y1={y} y2={y} />
-                <text x={chartPadding.left - 12} y={y + 4} textAnchor="end">
-                  {formatter.format(value)}
-                </text>
-              </g>
-            );
-          })}
-          <path className="chart-line" d={path} />
-          {points.map((point) => (
-            <g key={dateOnly(point.date)}>
-              <circle
-                className={
-                  dateOnly(point.date) === dateOnly(new Date())
-                    ? 'chart-point-current'
-                    : 'chart-point'
-                }
-                cx={point.x}
-                cy={point.y}
-                r="4"
-              />
-              <text className="chart-date" x={point.x} y={chartHeight - 12} textAnchor="middle">
-                {point.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-              </text>
-            </g>
-          ))}
-        </svg>
-      </div>
-    </section>
+function percentageChange(current: number | null, previous: number | null) {
+  if (current === null || previous === null || previous === 0) {
+    return null;
+  }
+  return ((current - previous) / previous) * 100;
+}
+
+function formatError(error: unknown) {
+  if (error instanceof ApiError && (error.status === 404 || error.status === 405)) {
+    return 'Donnée indisponible : route backend manquante';
+  }
+  return error instanceof Error ? error.message : 'Une erreur est survenue.';
+}
+
+function longDate(date: Date) {
+  const value = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full' }).format(date);
+  return value.charAt(0).toLocaleUpperCase('fr-FR') + value.slice(1);
+}
+
+function lastUpdatedLabel(timestamps: number[]) {
+  const timestamp = Math.max(...timestamps);
+  return timestamp
+    ? new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(timestamp)
+    : '—';
+}
+
+function SectionIcon({ type }: { type: 'performance' | 'attention' }) {
+  return type === 'performance' ? (
+    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+      <path d="M4 19V5M4 19h16M7 15l4-4 3 2 5-7" />
+    </svg>
+  ) : (
+    <span className="attention-dot" />
   );
 }
 
 export function DashboardPage() {
-  const dates = useMemo(recentDates, []);
-  const dateFrom = dateOnly(dates[0]);
-  const dateTo = dateOnly(dates[dates.length - 1]);
-  const today = useQuery({ queryKey: ['revenue', 'jour'], queryFn: () => api.revenue('jour') });
-  const month = useQuery({ queryKey: ['revenue', 'mois'], queryFn: () => api.revenue('mois') });
-  const top = useQuery({ queryKey: ['top-products'], queryFn: () => api.topProducts(5) });
+  const [period, setPeriod] = useState<DashboardPeriod>('7days');
+  const queryClient = useQueryClient();
+  const isAdmin = readSession()?.utilisateur.role === 'ADMIN';
+  const ranges = useMemo(() => getRanges(period), [period]);
+  const currentDates = useMemo(() => inclusiveDates(ranges.current), [ranges.current]);
+  const current = useQuery({
+    queryKey: ['dashboard', 'performance', ranges.current],
+    queryFn: () => fetchAllPurchases(ranges.current),
+  });
+  const previous = useQuery({
+    queryKey: ['dashboard', 'comparison', ranges.previous],
+    queryFn: () => fetchAllPurchases(ranges.previous),
+  });
+  const revenue = useQuery({
+    queryKey: ['dashboard', 'revenue', period],
+    queryFn: () => api.revenue(period === 'today' ? 'jour' : 'mois'),
+    enabled: period === 'today' || period === 'month',
+  });
   const stock = useQuery({
-    queryKey: ['products', 'low-stock'],
+    queryKey: ['dashboard', 'stock'],
     queryFn: () => api.products(0, '', 100, true),
   });
-  const sales = useQuery({
-    queryKey: ['dashboard-sales', dateFrom, dateTo],
-    queryFn: () => recentPurchases(dateFrom, dateTo),
+  const recentPurchases = useQuery({
+    queryKey: ['dashboard', 'recent-purchases'],
+    queryFn: () => api.purchases(0, {}),
+    enabled: isAdmin,
   });
-  const lowStock = stock.data?.content.filter((item) => item.stockActuel <= item.seuilAlerte) || [];
+  const recentDeliveries = useQuery({
+    queryKey: ['dashboard', 'recent-deliveries'],
+    queryFn: () => api.deliveries(0, {}),
+    enabled: isAdmin,
+  });
+  const inactive = useQuery({
+    queryKey: ['dashboard', 'inactive-users'],
+    queryFn: fetchInactiveUsers,
+    enabled: isAdmin,
+  });
+
+  const currentPurchases = current.data || [];
+  const previousPurchases = previous.data || [];
+  const salesTotal = sumPurchases(currentPurchases);
+  const usesRevenueEndpoint = period === 'today' || period === 'month';
+  const revenueError =
+    usesRevenueEndpoint && revenue.isError ? formatError(revenue.error) : undefined;
+  const authoritativeTotal = usesRevenueEndpoint
+    ? (revenue.data?.chiffreAffaires ?? null)
+    : current.isSuccess
+      ? salesTotal
+      : null;
+  const purchaseCount = current.isSuccess ? currentPurchases.length : null;
+  const articleCount = current.isSuccess ? countItems(currentPurchases) : null;
+  const previousTotal = previous.isSuccess ? sumPurchases(previousPurchases) : null;
+  const previousCount = previous.isSuccess ? previousPurchases.length : null;
+  const previousArticles = previous.isSuccess ? countItems(previousPurchases) : null;
+  const average =
+    purchaseCount && authoritativeTotal !== null ? authoritativeTotal / purchaseCount : null;
+  const previousAverage = previousCount ? previousTotal! / previousCount : null;
+  const stockAlerts = (stock.data?.content || [])
+    .filter((product) => product.stockActuel <= product.seuilAlerte)
+    .map((product) => ({
+      ...product,
+      alertType: product.stockActuel === 0 ? ('out' as const) : ('low' as const),
+    }))
+    .sort((left, right) => Number(right.alertType === 'out') - Number(left.alertType === 'out'));
+  const activities = useMemo(
+    () => toActivity(recentPurchases.data?.content || [], recentDeliveries.data?.content || []),
+    [recentPurchases.data, recentDeliveries.data],
+  );
+  const rankedProducts = useMemo(() => rankProducts(currentPurchases), [currentPurchases]);
+  const dayTotals = useMemo(
+    () => toDayTotals(currentPurchases, currentDates),
+    [currentDates, currentPurchases],
+  );
+  const latestTimestamp = lastUpdatedLabel([
+    current.dataUpdatedAt,
+    previous.dataUpdatedAt,
+    revenue.dataUpdatedAt,
+    stock.dataUpdatedAt,
+    recentPurchases.dataUpdatedAt,
+    recentDeliveries.dataUpdatedAt,
+    inactive.dataUpdatedAt,
+  ]);
+  const performanceError = current.isError ? formatError(current.error) : undefined;
+  const activityError =
+    recentPurchases.isError && recentDeliveries.isError
+      ? formatError(recentPurchases.error)
+      : undefined;
+  const activityPartialError = recentPurchases.isError
+    ? formatError(recentPurchases.error)
+    : recentDeliveries.isError
+      ? formatError(recentDeliveries.error)
+      : undefined;
+  const stockCount = stock.data?.totalElements || 0;
+  const inactiveCount = isAdmin && inactive.isSuccess ? inactive.data : 0;
+  const attentionCount =
+    stock.isSuccess && (!isAdmin || inactive.isSuccess)
+      ? stockCount + (isAdmin ? inactiveCount : 0)
+      : null;
+  const attentionClear =
+    stock.isSuccess &&
+    stockCount === 0 &&
+    (!isAdmin || (inactive.isSuccess && inactiveCount === 0));
+  const periodLabel = rangeDescription(period);
+  const refreshing =
+    current.isFetching ||
+    previous.isFetching ||
+    revenue.isFetching ||
+    stock.isFetching ||
+    recentPurchases.isFetching ||
+    recentDeliveries.isFetching ||
+    inactive.isFetching;
+
+  async function refreshDashboard() {
+    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  }
 
   return (
-    <>
-      <Heading
-        kicker="Synthèse"
-        title="Tableau de bord"
-        aside={
-          <Link className="button primary" to="/caisse">
-            Nouvelle vente
-          </Link>
-        }
+    <div className="dashboard-page">
+      <EnteteDePage
+        dateLabel={longDate(new Date())}
+        lastUpdated={latestTimestamp}
+        onPeriodChange={setPeriod}
+        onRefresh={refreshDashboard}
+        period={period}
+        refreshing={refreshing}
       />
 
-      <section className="dashboard-stats" aria-label="Indicateurs clés">
-        <div className="dashboard-stat">
-          <span>Aujourd’hui</span>
-          {today.isLoading ? (
-            <LoadingState label="Calcul…" />
-          ) : today.error ? (
-            <ErrorState error={today.error} />
-          ) : (
-            <strong>{money(today.data?.chiffreAffaires || 0)}</strong>
-          )}
-          <small>Chiffre d’affaires</small>
+      <section className="dashboard-zone performance-zone" aria-labelledby="performance-title">
+        <SectionTitre
+          description="Ventes et activité sur la période sélectionnée"
+          icon={<SectionIcon type="performance" />}
+          id="performance-title"
+          title="Performance"
+        />
+
+        <div className="dashboard-indicators" aria-label="Indicateurs de performance">
+          <IndicateurCle
+            format="money"
+            label="Chiffre d’affaires"
+            loading={
+              current.isLoading || ((period === 'today' || period === 'month') && revenue.isLoading)
+            }
+            value={revenueError ? null : authoritativeTotal}
+            variation={percentageChange(
+              current.isSuccess ? salesTotal : null,
+              previous.isSuccess ? previousTotal : null,
+            )}
+          />
+          <IndicateurCle
+            label="Nombre d’achats"
+            loading={current.isLoading}
+            value={purchaseCount}
+            variation={percentageChange(purchaseCount, previous.isSuccess ? previousCount : null)}
+          />
+          <IndicateurCle
+            format="money"
+            label="Panier moyen"
+            loading={current.isLoading}
+            value={average}
+            variation={percentageChange(
+              current.isSuccess ? average : null,
+              previous.isSuccess ? previousAverage : null,
+            )}
+          />
+          <IndicateurCle
+            label="Articles vendus"
+            loading={current.isLoading}
+            value={articleCount}
+            variation={percentageChange(articleCount, previous.isSuccess ? previousArticles : null)}
+          />
         </div>
-        <div className="dashboard-stat">
-          <span>Ce mois</span>
-          {month.isLoading ? (
-            <LoadingState label="Calcul…" />
-          ) : month.error ? (
-            <ErrorState error={month.error} />
-          ) : (
-            <strong>{money(month.data?.chiffreAffaires || 0)}</strong>
-          )}
-          <small>Chiffre d’affaires</small>
-        </div>
-        <div className="dashboard-stat">
-          <span>Stock bas</span>
-          {stock.isLoading ? (
-            <LoadingState label="Calcul…" />
-          ) : stock.error ? (
-            <ErrorState error={stock.error} />
-          ) : (
-            <strong>{stock.data?.totalElements || 0}</strong>
-          )}
-          <small>Produits à réapprovisionner</small>
-        </div>
+        {previous.isError && (
+          <div className="dashboard-comparison-error" role="status">
+            <p>Comparaison indisponible : {formatError(previous.error)}</p>
+            <button className="button" onClick={() => previous.refetch()} type="button">
+              Réessayer
+            </button>
+          </div>
+        )}
+        {performanceError && !isAdmin && (
+          <div className="dashboard-metric-error" role="alert">
+            <p>{performanceError}</p>
+            <button className="button" onClick={() => current.refetch()} type="button">
+              Réessayer
+            </button>
+          </div>
+        )}
+        {revenueError && (
+          <div className="dashboard-metric-error" role="alert">
+            <p>{revenueError}</p>
+            {revenue.isError && usesRevenueEndpoint && (
+              <button className="button" onClick={() => revenue.refetch()} type="button">
+                Réessayer
+              </button>
+            )}
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="dashboard-performance-grid">
+            <GraphiqueCA
+              error={performanceError}
+              loading={current.isLoading}
+              onRetry={() => current.refetch()}
+              periodLabel={periodLabel}
+              values={currentPurchases.length > 0 ? dayTotals : []}
+            />
+            <ClassementProduits
+              error={performanceError}
+              loading={current.isLoading}
+              onRetry={() => current.refetch()}
+              products={rankedProducts}
+            />
+          </div>
+        )}
       </section>
 
-      {sales.isLoading ? (
-        <section className="dashboard-chart">
-          <h2>Chiffre d’affaires · 7 jours</h2>
-          <LoadingState label="Chargement des ventes…" />
-        </section>
-      ) : sales.error ? (
-        <section className="dashboard-chart">
-          <h2>Chiffre d’affaires · 7 jours</h2>
-          <ErrorState error={sales.error} />
-        </section>
-      ) : (
-        <RevenueChart purchases={sales.data || []} dates={dates} />
-      )}
-
-      <div className="dashboard-columns">
-        <section className="section-block">
-          <div className="dashboard-section-heading">
-            <div>
-              <p className="eyebrow">Performance</p>
-              <h2>Produits les plus vendus</h2>
-            </div>
-          </div>
-          {top.isLoading ? (
-            <LoadingState label="Chargement des produits…" />
-          ) : top.error ? (
-            <ErrorState error={top.error} />
-          ) : (
-            <DataTable
-              headers={['PRODUIT', 'QUANTITÉ', 'VENTES']}
-              empty="Aucune vente enregistrée."
-            >
-              {top.data?.map((product) => (
-                <tr key={product.produitId}>
-                  <td>{product.produit}</td>
-                  <td className="right amount">{product.quantiteVendue}</td>
-                  <td className="right amount">{money(product.chiffreAffaires)}</td>
-                </tr>
-              ))}
-            </DataTable>
+      <section
+        className={`dashboard-zone attention-zone ${attentionClear ? 'attention-zone-clear' : ''}`}
+        aria-labelledby="attention-title"
+      >
+        <SectionTitre
+          count={attentionCount}
+          description="Éléments qui demandent une action"
+          icon={<SectionIcon type="attention" />}
+          id="attention-title"
+          title="À surveiller"
+        />
+        <div className={`dashboard-attention-grid ${isAdmin ? 'dashboard-attention-admin' : ''}`}>
+          <ListeAlertesStock
+            error={stock.isError ? formatError(stock.error) : undefined}
+            loading={stock.isLoading}
+            onRetry={() => stock.refetch()}
+            products={stockAlerts}
+          />
+          {isAdmin && (
+            <ActiviteRecente
+              activities={activities}
+              error={activityError}
+              loading={recentPurchases.isLoading && recentDeliveries.isLoading}
+              onRetry={() => {
+                recentPurchases.refetch();
+                recentDeliveries.refetch();
+              }}
+              partialError={activityError ? undefined : activityPartialError}
+            />
           )}
-        </section>
-
-        <section className="section-block stock-watch">
-          <div className="dashboard-section-heading">
-            <div>
-              <p className="eyebrow">À surveiller</p>
-              <h2>Stock bas</h2>
-            </div>
-            <Link to="/produits">Voir les produits</Link>
-          </div>
-          {stock.isLoading ? (
-            <LoadingState label="Chargement du stock…" />
-          ) : stock.error ? (
-            <ErrorState error={stock.error} />
-          ) : lowStock.length === 0 ? (
-            <EmptyState>Aucun produit sous son seuil d’alerte.</EmptyState>
-          ) : (
-            <ul className="stock-list">
-              {lowStock.slice(0, 6).map((product) => (
-                <li key={product.id}>
-                  <span>{product.nom}</span>
-                  <Tag warning>
-                    {product.stockActuel} / seuil {product.seuilAlerte}
-                  </Tag>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-    </>
+        </div>
+        {isAdmin && (
+          <ComptesInactifs
+            count={inactive.data ?? null}
+            error={inactive.isError ? formatError(inactive.error) : undefined}
+            loading={inactive.isLoading}
+            onRetry={() => inactive.refetch()}
+          />
+        )}
+      </section>
+    </div>
   );
 }

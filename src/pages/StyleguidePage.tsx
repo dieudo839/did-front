@@ -1,5 +1,12 @@
 import { useState } from 'react';
 import { Icon } from '../components/Icon';
+import { ActiviteRecente } from './dashboard/ActiviteRecente';
+import { ClassementProduits } from './dashboard/ClassementProduits';
+import { EnteteDePage } from './dashboard/EnteteDePage';
+import { GraphiqueCA } from './dashboard/GraphiqueCA';
+import { IndicateurCle } from './dashboard/IndicateurCle';
+import { ListeAlertesStock } from './dashboard/ListeAlertesStock';
+import { SectionTitre } from './dashboard/SectionTitre';
 import {
   Avatar,
   Button,
@@ -27,6 +34,9 @@ const colors = [
   ['Accent léger', 'color-accent-soft'],
   ['Erreur', 'color-danger'],
   ['Avertissement', 'color-warning'],
+  ['Fond d’attention', 'color-attention-background'],
+  ['Bordure d’alerte', 'color-warning-border'],
+  ['Barre de graphique', 'color-chart-bar'],
   ['Succès', 'color-success'],
 ];
 
@@ -143,6 +153,43 @@ export function StyleguidePage() {
             <span>1 250 FCFA</span>
           </div>
         </article>
+      </section>
+
+      <section className="styleguide-section" aria-labelledby="dashboard-components-heading">
+        <h2 id="dashboard-components-heading">Composants du tableau de bord</h2>
+        <EnteteDePage
+          dateLabel=""
+          lastUpdated="—"
+          onPeriodChange={() => undefined}
+          onRefresh={() => undefined}
+          period="7days"
+          refreshing={false}
+        />
+        <SectionTitre
+          description="Ventes et activité sur la période sélectionnée"
+          id="styleguide-performance-heading"
+          title="Performance"
+        />
+        <div className="dashboard-indicators" aria-label="Aperçu des indicateurs">
+          <IndicateurCle label="Chiffre d’affaires" loading value={null} variation={null} />
+          <IndicateurCle label="Nombre d’achats" loading value={null} variation={null} />
+          <IndicateurCle label="Panier moyen" loading value={null} variation={null} />
+          <IndicateurCle label="Articles vendus" loading value={null} variation={null} />
+        </div>
+        <div className="dashboard-performance-grid">
+          <GraphiqueCA loading periodLabel="7 derniers jours" values={[]} />
+          <ClassementProduits loading products={[]} />
+        </div>
+        <SectionTitre
+          count={0}
+          description="Éléments qui demandent une action"
+          id="styleguide-attention-heading"
+          title="À surveiller"
+        />
+        <div className="dashboard-attention-grid">
+          <ListeAlertesStock loading products={[]} />
+          <ActiviteRecente loading activities={[]} />
+        </div>
       </section>
 
       <section className="styleguide-section" aria-labelledby="dialog-heading">

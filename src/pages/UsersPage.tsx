@@ -6,6 +6,7 @@ import { api } from '../api';
 import { Heading, Pager } from '../components/layout';
 import {
   Button,
+  ConfirmationModal,
   DataTable,
   EmptyState,
   ErrorState,
@@ -35,6 +36,7 @@ export function UsersPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<User | null | false>(false);
+  const [userToChangeStatus, setUserToChangeStatus] = useState<User | null>(null);
   const [message, setMessage] = useState('');
   const users = useQuery({ queryKey: ['users', page], queryFn: () => api.users(page) });
   const form = useForm<UserValues>({ resolver: zodResolver(userSchema), defaultValues: blankUser });
@@ -42,6 +44,7 @@ export function UsersPage() {
     mutationFn: (body: UserValues) =>
       editing ? api.updateUser(editing.id, body) : api.createUser(body),
     onSuccess: (user) => {
+      setUserToChangeStatus(null);
       setMessage(`Compte ${user.identifiant} enregistré.`);
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -58,7 +61,10 @@ export function UsersPage() {
       );
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (error) => setMessage(apiErrorMessage(error)),
+    onError: (error) => {
+      setUserToChangeStatus(null);
+      setMessage(apiErrorMessage(error));
+    },
   });
 
   function openUser(user: User | null) {
@@ -102,7 +108,7 @@ export function UsersPage() {
       ) : users.error ? (
         <ErrorState error={users.error} />
       ) : users.data?.content.length ? (
-        <DataTable headers={['NOM', 'MATRICULE', 'IDENTIFIANT', 'RÔLE', 'ÉTAT', 'GESTE']}>
+        <DataTable headers={['NOM', 'MATRICULE', 'NOM D’UTILISATEUR', 'RÔLE', 'ÉTAT', 'GESTE']}>
           {users.data.content.map((user) => (
             <tr key={user.id}>
               <td>
@@ -126,7 +132,7 @@ export function UsersPage() {
                 <button
                   type="button"
                   disabled={status.isPending}
-                  onClick={() => status.mutate({ id: user.id, actif: !user.actif })}
+                  onClick={() => setUserToChangeStatus(user)}
                 >
                   {user.actif ? 'Désactiver' : 'Réactiver'}
                 </button>
@@ -138,6 +144,37 @@ export function UsersPage() {
         <EmptyState>Aucun compte dans le registre.</EmptyState>
       )}
       <Pager page={page} pages={users.data?.totalPages || 0} setPage={setPage} />
+      {userToChangeStatus && (
+        <ConfirmationModal
+          title={userToChangeStatus.actif ? 'Désactiver ce compte ?' : 'Réactiver ce compte ?'}
+          description={
+            userToChangeStatus.actif ? (
+              <>
+                Le compte de{' '}
+                <strong>
+                  {userToChangeStatus.prenom} {userToChangeStatus.nom}
+                </strong>{' '}
+                ne pourra plus se connecter tant qu’il est désactivé.
+              </>
+            ) : (
+              <>
+                Le compte de{' '}
+                <strong>
+                  {userToChangeStatus.prenom} {userToChangeStatus.nom}
+                </strong>{' '}
+                pourra de nouveau se connecter.
+              </>
+            )
+          }
+          confirmLabel={userToChangeStatus.actif ? 'Désactiver le compte' : 'Réactiver le compte'}
+          onCancel={() => setUserToChangeStatus(null)}
+          onConfirm={() =>
+            status.mutate({ id: userToChangeStatus.id, actif: !userToChangeStatus.actif })
+          }
+          pending={status.isPending}
+          danger={userToChangeStatus.actif}
+        />
+      )}
       {editing !== false && (
         <Modal
           title={editing ? 'Modifier le compte' : 'Nouveau compte'}
@@ -178,7 +215,7 @@ export function UsersPage() {
               error={form.formState.errors.dateNaissance?.message}
             />
             <Field
-              label="Identifiant"
+              label="Nom d’utilisateur"
               {...form.register('identifiant')}
               error={form.formState.errors.identifiant?.message}
             />

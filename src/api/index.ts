@@ -19,6 +19,19 @@ import type {
   UserRequest,
 } from '../types';
 
+interface ProductFilters {
+  stockMinimum?: string;
+  stockMaximum?: string;
+  prixMinimum?: string;
+  prixMaximum?: string;
+  sort?: string;
+}
+
+interface ClientFilters {
+  telephone?: string;
+  frequents?: boolean;
+}
+
 function pageParams(
   page: number,
   size: number,
@@ -38,11 +51,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ identifiant, motDePasse }),
     }),
-  products: (page = 0, nom = '', size = 20, stockBas = false) =>
+  products: (page = 0, nom = '', size = 20, stockBas = false, filters: ProductFilters = {}) =>
     request<Page<Product>>(
-      `/api/produits?${pageParams(page, size, 'nom,asc', {
+      `/api/produits?${pageParams(page, size, filters.sort || 'nom,asc', {
         nom: nom || undefined,
         stockBas: stockBas ? 'true' : undefined,
+        stockMinimum: filters.stockMinimum,
+        stockMaximum: filters.stockMaximum,
+        prixMinimum: filters.prixMinimum,
+        prixMaximum: filters.prixMaximum,
       })}`,
     ),
   createProduct: (body: ProductRequest) =>
@@ -53,27 +70,31 @@ export const api = {
   createPurchase: (body: PurchaseRequest) =>
     request<Purchase>('/api/achats', { method: 'POST', body: JSON.stringify(body) }),
   purchases: (page: number, filters: Record<string, string | undefined>) =>
-    request<Page<Purchase>>(`/api/achats?${pageParams(page, 20, 'dateAchat,desc', filters)}`),
+    request<Page<Purchase>>(`/api/achats?${pageParams(page, 10, 'dateAchat,desc', filters)}`),
   ticket: (id: string) => request<Ticket>(`/api/achats/${id}/ticket`),
   ticketPdf: (id: string) => requestBlob(`/api/achats/${id}/ticket/pdf`),
   createDelivery: (body: DeliveryRequest) =>
     request<Delivery>('/api/livraisons', { method: 'POST', body: JSON.stringify(body) }),
   deliveries: (page: number, filters: Record<string, string | undefined>) =>
     request<Page<Delivery>>(
-      `/api/livraisons?${pageParams(page, 20, 'dateLivraison,desc', filters)}`,
+      `/api/livraisons?${pageParams(page, 10, 'dateLivraison,desc', filters)}`,
     ),
-  clients: (nom: string) =>
-    request<Page<Client>>(`/api/clients?${pageParams(0, nom ? 10 : 100, 'nom,asc', { nom })}`),
+  clients: (nom = '', page = 0, size = nom ? 10 : 100, filters: ClientFilters = {}) =>
+    request<Page<Client>>(
+      `/api/clients?${pageParams(page, size, 'nom,asc', {
+        nom,
+        telephone: filters.telephone,
+        frequents: filters.frequents ? 'true' : undefined,
+      })}`,
+    ),
   createClient: (body: ClientRequest) =>
     request<Client>('/api/clients', { method: 'POST', body: JSON.stringify(body) }),
-  wholesalers: (nom: string) =>
-    request<Page<Grossiste>>(
-      `/api/grossistes?${pageParams(0, nom ? 10 : 100, 'nom,asc', { nom })}`,
-    ),
+  wholesalers: (nom = '', page = 0, size = nom ? 10 : 100) =>
+    request<Page<Grossiste>>(`/api/grossistes?${pageParams(page, size, 'nom,asc', { nom })}`),
   createWholesaler: (body: GrossisteRequest) =>
     request<Grossiste>('/api/grossistes', { method: 'POST', body: JSON.stringify(body) }),
   users: (page: number) =>
-    request<Page<User>>(`/api/utilisateurs?${pageParams(page, 20, 'nom,asc')}`),
+    request<Page<User>>(`/api/utilisateurs?${pageParams(page, 10, 'nom,asc')}`),
   createUser: (body: UserRequest) =>
     request<User>('/api/utilisateurs', { method: 'POST', body: JSON.stringify(body) }),
   updateUser: (id: string, body: UserRequest) =>

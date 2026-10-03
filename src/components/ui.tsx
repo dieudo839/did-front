@@ -1,5 +1,8 @@
 import {
+  Children,
+  cloneElement,
   forwardRef,
+  isValidElement,
   useEffect,
   useId,
   useRef,
@@ -211,14 +214,36 @@ export function DataTable({
   headers,
   children,
   empty,
+  className = '',
 }: {
   headers: string[];
   children: ReactNode;
   empty?: string;
+  className?: string;
 }) {
+  let columnIndex = 0;
+  const labelledRows = Children.map(children, (row) => {
+    if (!isValidElement<{ children?: ReactNode }>(row) || row.type !== 'tr') {
+      return row;
+    }
+
+    columnIndex = 0;
+    const cells = Children.map(row.props.children, (cell) => {
+      if (!isValidElement(cell) || cell.type !== 'td') {
+        return cell;
+      }
+
+      const label = headers[columnIndex];
+      columnIndex += 1;
+      return cloneElement(cell, { 'data-label': label });
+    });
+
+    return cloneElement(row, undefined, cells);
+  });
+
   return (
     <div className="table-wrap">
-      <table>
+      <table className={className}>
         <thead>
           <tr>
             {headers.map((header) => (
@@ -226,7 +251,7 @@ export function DataTable({
             ))}
           </tr>
         </thead>
-        <tbody>{children}</tbody>
+        <tbody>{labelledRows}</tbody>
       </table>
       {empty && <EmptyState>{empty}</EmptyState>}
     </div>
@@ -312,5 +337,44 @@ export function Modal({
         {children}
       </section>
     </div>
+  );
+}
+
+export function ConfirmationModal({
+  title,
+  description,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+  pending = false,
+  danger = false,
+}: {
+  title: string;
+  description: ReactNode;
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  pending?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <Modal title={title} onClose={onCancel}>
+      <div className="confirmation-content">
+        <p>{description}</p>
+        <div className="confirmation-actions">
+          <Button type="button" onClick={onCancel} disabled={pending}>
+            Annuler
+          </Button>
+          <Button
+            className={danger ? 'danger' : 'primary'}
+            type="button"
+            onClick={onConfirm}
+            disabled={pending}
+          >
+            {pending ? 'En cours…' : confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

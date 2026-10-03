@@ -12,10 +12,14 @@
   --color-danger-soft: #fef3f2;
   --color-warning: #b54708;
   --color-warning-soft: #fffaeb;
+  --color-warning-region: #fffbf5;
+  --color-warning-border: #f2cc9a;
+  --color-attention-background: #fffbf5;
   --color-success: #027a48;
   --color-success-soft: #ecfdf3;
   --color-overlay: rgb(28 25 23 / 32%);
   --color-skeleton: #f5f5f4;
+  --color-chart-bar: #d6d3d1;
   --font-sans: 'DM Sans', sans-serif;
   --font-ticket: ui-monospace, 'Courier New', monospace;
   --text-xs: 12px;
@@ -50,10 +54,16 @@
   --sidebar-width: 220px;
   --viewport-min: 320px;
   --width-modal: 520px;
+  --width-login-panel: 440px;
+  --width-mobile-table-label: 124px;
   --width-styleguide-copy: 640px;
   --width-swatch: 148px;
   --width-control-sample: 360px;
   --width-table-sample: 560px;
   --width-state-sample: 220px;
   --width-receipt-sample: 300px;
+  --attention-rule-width: 3px;
+  --dashboard-separation: 48px;
+  --dashboard-min-panel: 340px;
+  --dropdown-max-height: 240px;
 }
