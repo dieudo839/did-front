@@ -10,6 +10,7 @@
   --color-accent-soft: #eef3f1;
   --color-danger: #b42318;
   --color-danger-soft: #fef3f2;
+  --color-danger-border: #fecdca;
   --color-warning: #b54708;
   --color-warning-soft: #fffaeb;
   --color-warning-region: #fffbf5;
@@ -54,6 +55,10 @@
   --sidebar-width: 220px;
   --viewport-min: 320px;
   --width-modal: 520px;
+  --width-confirmation-modal: 440px;
+  --width-profile-aside: 280px;
+  --avatar-size-small: 40px;
+  --avatar-size-profile: 72px;
   --width-login-panel: 440px;
   --width-mobile-table-label: 124px;
   --width-styleguide-copy: 640px;
@@ -66,4 +71,13 @@
   --dashboard-separation: 48px;
   --dashboard-min-panel: 340px;
   --dropdown-max-height: 240px;
+  --loading-indicator-size: 16px;
+  --loading-indicator-width: 2px;
+  --loading-indicator-duration: 800ms;
+  --loading-overlay-background: rgb(250 250 249 / 92%);
+  --loading-overlay-z-index: 9999;
+  --loading-overlay-indicator-size: 72px;
+  --loading-overlay-logo-size: 40px;
+  --loading-overlay-dot-size: 8px;
+  --loading-overlay-duration: 900ms;
 }

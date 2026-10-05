@@ -7,6 +7,7 @@ import type {
   Grossiste,
   GrossisteRequest,
   Page,
+  ProfileRequest,
   Product,
   ProductRequest,
   Purchase,
@@ -30,6 +31,7 @@ interface ProductFilters {
 interface ClientFilters {
   telephone?: string;
   frequents?: boolean;
+  achatsMinimum?: string;
 }
 
 function pageParams(
@@ -69,22 +71,24 @@ export const api = {
   deleteProduct: (id: string) => request<void>(`/api/produits/${id}`, { method: 'DELETE' }),
   createPurchase: (body: PurchaseRequest) =>
     request<Purchase>('/api/achats', { method: 'POST', body: JSON.stringify(body) }),
-  purchases: (page: number, filters: Record<string, string | undefined>) =>
-    request<Page<Purchase>>(`/api/achats?${pageParams(page, 10, 'dateAchat,desc', filters)}`),
+  purchases: (page: number, filters: Record<string, string | undefined>, sort = 'dateAchat,desc') =>
+    request<Page<Purchase>>(`/api/achats?${pageParams(page, 10, sort, filters)}`),
   ticket: (id: string) => request<Ticket>(`/api/achats/${id}/ticket`),
   ticketPdf: (id: string) => requestBlob(`/api/achats/${id}/ticket/pdf`),
   createDelivery: (body: DeliveryRequest) =>
     request<Delivery>('/api/livraisons', { method: 'POST', body: JSON.stringify(body) }),
-  deliveries: (page: number, filters: Record<string, string | undefined>) =>
-    request<Page<Delivery>>(
-      `/api/livraisons?${pageParams(page, 10, 'dateLivraison,desc', filters)}`,
-    ),
+  deliveries: (
+    page: number,
+    filters: Record<string, string | undefined>,
+    sort = 'dateLivraison,desc',
+  ) => request<Page<Delivery>>(`/api/livraisons?${pageParams(page, 10, sort, filters)}`),
   clients: (nom = '', page = 0, size = nom ? 10 : 100, filters: ClientFilters = {}) =>
     request<Page<Client>>(
       `/api/clients?${pageParams(page, size, 'nom,asc', {
         nom,
         telephone: filters.telephone,
         frequents: filters.frequents ? 'true' : undefined,
+        achatsMinimum: filters.achatsMinimum,
       })}`,
     ),
   createClient: (body: ClientRequest) =>
@@ -109,6 +113,8 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ ancienMotDePasse, nouveauMotDePasse }),
     }),
+  updateProfile: (body: ProfileRequest) =>
+    request<User>('/api/auth/profil', { method: 'PUT', body: JSON.stringify(body) }),
   revenue: (periode: 'jour' | 'mois') =>
     request<Revenue>(`/api/statistiques/chiffre-affaires?periode=${periode}`),
   topProducts: (limit = 5) =>

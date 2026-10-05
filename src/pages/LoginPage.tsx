@@ -9,6 +9,7 @@ import type { Session } from '../types';
 
 export function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) {
   const [serverError, setServerError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { identifiant: '', motDePasse: '' },
@@ -41,13 +42,26 @@ export function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) 
             {...form.register('identifiant')}
             error={form.formState.errors.identifiant?.message}
           />
-          <Field
-            label="Mot de passe"
-            type="password"
-            autoComplete="current-password"
-            {...form.register('motDePasse')}
-            error={form.formState.errors.motDePasse?.message}
-          />
+          <div className="login-password-field">
+            <Field
+              id="login-password"
+              label="Mot de passe"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              {...form.register('motDePasse')}
+              error={form.formState.errors.motDePasse?.message}
+            />
+            <button
+              aria-controls="login-password"
+              aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+              aria-pressed={showPassword}
+              className="login-password-toggle"
+              onClick={() => setShowPassword((visible) => !visible)}
+              type="button"
+            >
+              {showPassword ? 'Masquer' : 'Afficher'}
+            </button>
+          </div>
           {serverError && (
             <p className="error form-message" role="alert">
               {serverError}

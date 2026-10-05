@@ -3,9 +3,18 @@ import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
-import { Button, ErrorState, Field, LoadingState, Modal } from '../components/ui';
+import {
+  ActionFeedback,
+  Button,
+  ErrorState,
+  Field,
+  IconButton,
+  LoadingState,
+  Modal,
+  NumberField,
+} from '../components/ui';
 import { Heading } from '../components/layout';
-import { applyApiFieldErrors } from '../forms';
+import { apiErrorMessage, applyApiFieldErrors } from '../forms';
 import {
   deliverySchema,
   productSchema,
@@ -33,7 +42,10 @@ export function DeliveriesPage({ role }: { role: Role }) {
   const [wholesalerModal, setWholesalerModal] = useState(false);
   const [productModal, setProductModal] = useState(false);
   const [productLineIndex, setProductLineIndex] = useState<number | null>(null);
-  const [success, setSuccess] = useState('');
+  const [feedback, setFeedback] = useState<{
+    tone: 'success' | 'error';
+    message: string;
+  } | null>(null);
   useEffect(() => {
     const timer = window.setTimeout(() => setWholesalerTerm(wholesalerSearch.trim()), 250);
     return () => window.clearTimeout(timer);
@@ -62,8 +74,17 @@ export function DeliveriesPage({ role }: { role: Role }) {
   const rowList = useFieldArray({ control: form.control, name: 'lignes' });
   const watched = useWatch({ control: form.control, name: 'lignes' }) || [];
   const estimate = useMemo(
-    () => watched.reduce((total, line) => total + line.quantite * line.prixAchatUnitaire, 0),
+    () =>
+      watched.reduce((total, line) => {
+        const quantity = Number.isFinite(line.quantite) ? line.quantite : 0;
+        const unitPrice = Number.isFinite(line.prixAchatUnitaire) ? line.prixAchatUnitaire : 0;
+        return total + quantity * unitPrice;
+      }, 0),
     [watched],
+  );
+  const totalQuantity = watched.reduce(
+    (total, line) => total + (Number.isFinite(line.quantite) ? line.quantite : 0),
+    0,
   );
   const wholesalerForm = useForm<GrossisteRequest>({
     resolver: zodResolver(wholesalerSchema),
@@ -76,15 +97,22 @@ export function DeliveriesPage({ role }: { role: Role }) {
       setWholesalerSearch(wholesaler.nom);
       form.setValue('grossisteId', wholesaler.id, { shouldValidate: true });
       setWholesalerModal(false);
+      setFeedback({ tone: 'success', message: `${wholesaler.nom} a été ajouté au carnet.` });
       queryClient.invalidateQueries({ queryKey: ['wholesalers'] });
       wholesalerForm.reset();
     },
-    onError: (error) => applyApiFieldErrors(error, wholesalerForm.setError),
+    onError: (error) => {
+      applyApiFieldErrors(error, wholesalerForm.setError);
+      setFeedback({ tone: 'error', message: apiErrorMessage(error) });
+    },
   });
   const save = useMutation({
     mutationFn: (values: DeliveryValues) => api.createDelivery(values),
     onSuccess: (delivery) => {
-      setSuccess(`Arrivage de ${delivery.grossiste} enregistré. Le stock a été mis à jour.`);
+      setFeedback({
+        tone: 'success',
+        message: `Arrivage de ${delivery.grossiste} enregistré. Le stock a été mis à jour.`,
+      });
       form.reset({
         grossisteId: '',
         lignes: [{ produitId: '', quantite: 1, prixAchatUnitaire: 0 }],
@@ -94,7 +122,10 @@ export function DeliveriesPage({ role }: { role: Role }) {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });
     },
-    onError: (error) => applyApiFieldErrors(error, form.setError),
+    onError: (error) => {
+      applyApiFieldErrors(error, form.setError);
+      setFeedback({ tone: 'error', message: apiErrorMessage(error) });
+    },
   });
   const createProduct = useMutation({
     mutationFn: (values: ProductRequest) => api.createProduct(values),
@@ -119,12 +150,18 @@ export function DeliveriesPage({ role }: { role: Role }) {
       setProductModal(false);
       setProductLineIndex(null);
       productForm.reset(emptyProduct);
-      setSuccess(`${product.nom} a été ajouté au catalogue et à cette ligne d’arrivage.`);
+      setFeedback({
+        tone: 'success',
+        message: `${product.nom} a été ajouté au catalogue et à cette ligne d’arrivage.`,
+      });
     },
-    onError: (error) => applyApiFieldErrors(error, productForm.setError),
+    onError: (error) => {
+      applyApiFieldErrors(error, productForm.setError);
+      setFeedback({ tone: 'error', message: apiErrorMessage(error) });
+    },
   });
   const submit = form.handleSubmit((values) => {
-    setSuccess('');
+    setFeedback(null);
     save.mutate(values);
   });
 
@@ -166,184 +203,249 @@ export function DeliveriesPage({ role }: { role: Role }) {
 
   return (
     <>
-      <Heading kicker="RÉAPPROVISIONNEMENT · ENTRÉE DE STOCK" title="Les arrivages" />
+      <Heading kicker="RÉAPPROVISIONNEMENT · ENTRÉE DE STOCK" title="Nouvel arrivage" />
+      <p className="delivery-introduction">
+        Enregistrez les marchandises reçues. Le stock sera mis à jour après validation.
+      </p>
       <form className="delivery-form" onSubmit={submit} noValidate>
-        <div className="supplier-picker">
-          <Field
-            aria-autocomplete="list"
-            aria-controls={
-              wholesalerTerm === wholesalerSearch.trim() && wholesalers.data?.content.length
-                ? 'grossiste-options'
-                : undefined
-            }
-            aria-expanded={Boolean(wholesalerSearch.trim()) && !selectedWholesaler}
-            aria-haspopup="listbox"
-            label="Grossiste"
-            name="grossiste-search"
-            value={wholesalerSearch}
-            onChange={(event) => {
-              setWholesalerSearch(event.target.value);
-              setSelectedWholesaler(null);
-              form.setValue('grossisteId', '');
-            }}
-            onKeyDown={handleWholesalerKeyDown}
-            placeholder="Chercher par nom…"
-            autoComplete="off"
-            error={form.formState.errors.grossisteId?.message}
-          />
-          {wholesalerSearch.trim() && !selectedWholesaler && (
-            <>
-              {wholesalerTerm !== wholesalerSearch.trim() || wholesalers.isLoading ? (
-                <p className="supplier-search-status" role="status">
-                  Recherche des grossistes…
-                </p>
-              ) : wholesalers.isError ? (
-                <div className="supplier-search-error">
-                  <ErrorState error={wholesalers.error} />
-                  <Button onClick={() => wholesalers.refetch()} type="button">
-                    Réessayer
-                  </Button>
-                </div>
-              ) : wholesalers.data?.content.length ? (
-                <div
-                  className="supplier-options"
-                  id="grossiste-options"
-                  role="listbox"
-                  aria-label="Grossistes correspondants"
-                >
-                  {wholesalers.data.content.map((wholesaler) => (
-                    <button
-                      aria-selected="false"
-                      className="suggestion"
-                      key={wholesaler.id}
-                      onClick={() => selectWholesaler(wholesaler)}
-                      role="option"
-                      type="button"
-                    >
-                      <span>{wholesaler.nom}</span>
-                      <small>{wholesaler.telephone || 'Téléphone non renseigné'}</small>
-                    </button>
-                  ))}
-                </div>
-              ) : wholesalers.isSuccess ? (
-                <div className="supplier-no-results" role="status">
-                  <span>Aucun grossiste ne correspond à cette recherche.</span>
-                  <button
-                    className="text-button"
-                    onClick={() => setWholesalerModal(true)}
-                    type="button"
-                  >
-                    Ajouter ce grossiste
-                  </button>
-                </div>
-              ) : null}
-            </>
-          )}
-          {selectedWholesaler && (
-            <p className="supplier-selected" role="status">
-              Grossiste sélectionné : {selectedWholesaler.nom}
-            </p>
-          )}
-        </div>
-        <h2>Marchandises reçues</h2>
-        {products.isLoading ? (
-          <LoadingState label="Lecture du catalogue…" />
-        ) : products.error ? (
-          <ErrorState error={products.error} />
-        ) : (
-          rowList.fields.map((row, index) => (
-            <div className="delivery-item" key={row.id}>
-              <div className="delivery-line">
-                <div className="field-wrap">
-                  <label className="field-label" htmlFor={`delivery-product-${index}`}>
-                    Produit
-                  </label>
-                  <select
-                    className="field-select"
-                    id={`delivery-product-${index}`}
-                    aria-label={`Produit pour ligne ${index + 1}`}
-                    aria-invalid={Boolean(form.formState.errors.lignes?.[index]?.produitId)}
-                    aria-describedby={
-                      form.formState.errors.lignes?.[index]?.produitId
-                        ? `line-product-${index}-error`
-                        : undefined
-                    }
-                    {...form.register(`lignes.${index}.produitId`)}
-                  >
-                    <option value="">Choisir un produit</option>
-                    {products.data?.content.map((product: Product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.nom}
-                      </option>
-                    ))}
-                  </select>
-                  {form.formState.errors.lignes?.[index]?.produitId?.message && (
-                    <span className="field-error" id={`line-product-${index}-error`} role="alert">
-                      {form.formState.errors.lignes[index]?.produitId?.message}
-                    </span>
-                  )}
-                </div>
-                <Field
-                  label="Quantité"
-                  type="number"
-                  min="1"
-                  step="1"
-                  {...form.register(`lignes.${index}.quantite`, { valueAsNumber: true })}
-                  error={form.formState.errors.lignes?.[index]?.quantite?.message}
-                />
-                <Field
-                  label="Prix d’achat unitaire"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  {...form.register(`lignes.${index}.prixAchatUnitaire`, { valueAsNumber: true })}
-                  error={form.formState.errors.lignes?.[index]?.prixAchatUnitaire?.message}
-                />
-                <button type="button" className="remove" onClick={() => rowList.remove(index)}>
-                  Retirer
-                </button>
+        <div className="delivery-main">
+          <section className="delivery-section" aria-labelledby="delivery-supplier-title">
+            <div className="delivery-section-heading">
+              <span className="delivery-step" aria-hidden="true">
+                01
+              </span>
+              <div>
+                <h2 id="delivery-supplier-title">Grossiste</h2>
+                <p>Choisissez le fournisseur de cet arrivage.</p>
               </div>
-              {admin && (
-                <button
-                  className="text-button add-delivery-product"
-                  onClick={() => openProductModal(index)}
-                  type="button"
-                >
-                  Produit absent ? Ajouter au catalogue
-                </button>
+            </div>
+            <div className="supplier-picker">
+              <Field
+                aria-autocomplete="list"
+                aria-controls={
+                  wholesalerTerm === wholesalerSearch.trim() && wholesalers.data?.content.length
+                    ? 'grossiste-options'
+                    : undefined
+                }
+                aria-expanded={Boolean(wholesalerSearch.trim()) && !selectedWholesaler}
+                aria-haspopup="listbox"
+                label="Grossiste"
+                name="grossiste-search"
+                value={wholesalerSearch}
+                onChange={(event) => {
+                  setWholesalerSearch(event.target.value);
+                  setSelectedWholesaler(null);
+                  form.setValue('grossisteId', '');
+                }}
+                onKeyDown={handleWholesalerKeyDown}
+                placeholder="Chercher par nom…"
+                autoComplete="off"
+                error={form.formState.errors.grossisteId?.message}
+              />
+              {wholesalerSearch.trim() && !selectedWholesaler && (
+                <>
+                  {wholesalerTerm !== wholesalerSearch.trim() || wholesalers.isLoading ? (
+                    <p className="supplier-search-status" role="status">
+                      Recherche des grossistes…
+                    </p>
+                  ) : wholesalers.isError ? (
+                    <div className="supplier-search-error">
+                      <ErrorState error={wholesalers.error} />
+                      <Button onClick={() => wholesalers.refetch()} type="button">
+                        Réessayer
+                      </Button>
+                    </div>
+                  ) : wholesalers.data?.content.length ? (
+                    <div
+                      className="supplier-options"
+                      id="grossiste-options"
+                      role="listbox"
+                      aria-label="Grossistes correspondants"
+                    >
+                      {wholesalers.data.content.map((wholesaler) => (
+                        <button
+                          aria-selected="false"
+                          className="suggestion"
+                          key={wholesaler.id}
+                          onClick={() => selectWholesaler(wholesaler)}
+                          role="option"
+                          type="button"
+                        >
+                          <span>{wholesaler.nom}</span>
+                          <small>{wholesaler.telephone || 'Téléphone non renseigné'}</small>
+                        </button>
+                      ))}
+                    </div>
+                  ) : wholesalers.isSuccess ? (
+                    <div className="supplier-no-results" role="status">
+                      <span>Aucun grossiste ne correspond à cette recherche.</span>
+                      <button
+                        className="text-button"
+                        onClick={() => setWholesalerModal(true)}
+                        type="button"
+                      >
+                        Ajouter ce grossiste
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
+              {selectedWholesaler && (
+                <p className="supplier-selected" role="status">
+                  Grossiste sélectionné : {selectedWholesaler.nom}
+                </p>
               )}
             </div>
-          ))
-        )}
-        {form.formState.errors.lignes?.root?.message && (
-          <p className="field-error" role="alert">
-            {form.formState.errors.lignes.root.message}
-          </p>
-        )}
-        <button
-          type="button"
-          className="text-button"
-          onClick={() => rowList.append({ produitId: '', quantite: 1, prixAchatUnitaire: 0 })}
-        >
-          + Ajouter une ligne
-        </button>
-        <div className="basket-total">
-          <span>TOTAL INDICATIF</span>
-          <strong>{money(estimate)}</strong>
+          </section>
+          <section className="delivery-section" aria-labelledby="delivery-products-title">
+            <div className="delivery-section-heading delivery-products-heading">
+              <span className="delivery-step" aria-hidden="true">
+                02
+              </span>
+              <div>
+                <h2 id="delivery-products-title">Produits reçus</h2>
+                <p>Ajoutez une ligne pour chaque produit de la livraison.</p>
+              </div>
+              <Button
+                className="delivery-add-line"
+                onClick={() =>
+                  rowList.prepend(
+                    { produitId: '', quantite: 1, prixAchatUnitaire: 0 },
+                    { shouldFocus: true },
+                  )
+                }
+                type="button"
+              >
+                + Ajouter une ligne
+              </Button>
+            </div>
+            {products.isLoading ? (
+              <LoadingState label="Lecture du catalogue…" />
+            ) : products.error ? (
+              <ErrorState error={products.error} />
+            ) : (
+              rowList.fields.map((row, index) => (
+                <div className="delivery-item" key={row.id}>
+                  <div className="delivery-item-heading">
+                    <strong>Ligne {String(index + 1).padStart(2, '0')}</strong>
+                    {rowList.fields.length > 1 && (
+                      <IconButton
+                        className="danger-icon"
+                        icon="remove"
+                        label={`Retirer la ligne ${index + 1}`}
+                        onClick={() => rowList.remove(index)}
+                      />
+                    )}
+                  </div>
+                  <div className="delivery-line">
+                    <div className="field-wrap">
+                      <label className="field-label" htmlFor={`delivery-product-${index}`}>
+                        Produit
+                      </label>
+                      <select
+                        className="field-select"
+                        id={`delivery-product-${index}`}
+                        aria-label={`Produit pour ligne ${index + 1}`}
+                        aria-invalid={Boolean(form.formState.errors.lignes?.[index]?.produitId)}
+                        aria-describedby={
+                          form.formState.errors.lignes?.[index]?.produitId
+                            ? `line-product-${index}-error`
+                            : undefined
+                        }
+                        {...form.register(`lignes.${index}.produitId`)}
+                      >
+                        <option value="">Choisir un produit</option>
+                        {products.data?.content.map((product: Product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.nom}
+                          </option>
+                        ))}
+                      </select>
+                      {form.formState.errors.lignes?.[index]?.produitId?.message && (
+                        <span
+                          className="field-error"
+                          id={`line-product-${index}-error`}
+                          role="alert"
+                        >
+                          {form.formState.errors.lignes[index]?.produitId?.message}
+                        </span>
+                      )}
+                    </div>
+                    <NumberField
+                      control={form.control}
+                      label="Quantité reçue"
+                      name={`lignes.${index}.quantite`}
+                      min={1}
+                      step={1}
+                      error={form.formState.errors.lignes?.[index]?.quantite?.message}
+                    />
+                    <NumberField
+                      control={form.control}
+                      label="Prix d’achat unitaire"
+                      name={`lignes.${index}.prixAchatUnitaire`}
+                      min={0.01}
+                      step={0.01}
+                      decimal
+                      error={form.formState.errors.lignes?.[index]?.prixAchatUnitaire?.message}
+                    />
+                  </div>
+                  {admin && (
+                    <button
+                      className="text-button add-delivery-product"
+                      onClick={() => openProductModal(index)}
+                      type="button"
+                    >
+                      Produit absent ? Ajouter au catalogue
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+            {form.formState.errors.lignes?.root?.message && (
+              <p className="field-error" role="alert">
+                {form.formState.errors.lignes.root.message}
+              </p>
+            )}
+          </section>
         </div>
-        {success && (
-          <p className="success" role="status">
-            {success}
-          </p>
-        )}
-        {save.isError && <ErrorState error={save.error} />}
-        <Button className="primary" type="submit" disabled={save.isPending || products.isLoading}>
-          {save.isPending ? 'Enregistrement…' : 'Valider l’arrivage'}
-        </Button>
+        <aside className="delivery-summary" aria-labelledby="delivery-summary-title">
+          <p className="eyebrow">RÉCAPITULATIF</p>
+          <h2 id="delivery-summary-title">Cet arrivage</h2>
+          <dl className="delivery-summary-details">
+            <div>
+              <dt>Grossiste</dt>
+              <dd>{selectedWholesaler?.nom || 'À sélectionner'}</dd>
+            </div>
+            <div>
+              <dt>Lignes de produits</dt>
+              <dd>{rowList.fields.length}</dd>
+            </div>
+            <div>
+              <dt>Unités reçues</dt>
+              <dd>{totalQuantity}</dd>
+            </div>
+          </dl>
+          <div className="delivery-summary-total">
+            <span>Total indicatif</span>
+            <strong>{money(estimate)}</strong>
+          </div>
+          <Button
+            className="primary full"
+            type="submit"
+            disabled={save.isPending || products.isLoading}
+          >
+            {save.isPending ? 'Enregistrement…' : 'Valider l’arrivage'}
+          </Button>
+          <p className="delivery-summary-note">Le total définitif est calculé par le serveur.</p>
+        </aside>
       </form>
 
       {wholesalerModal && (
-        <Modal title="Nouveau grossiste" onClose={() => setWholesalerModal(false)}>
+        <Modal
+          title="Nouveau grossiste"
+          description="Ajoutez ce fournisseur au carnet pour le sélectionner dans cet arrivage."
+          onClose={() => setWholesalerModal(false)}
+        >
           <form
             className="editor-form"
             onSubmit={wholesalerForm.handleSubmit((values) => saveWholesaler.mutate(values))}
@@ -364,7 +466,6 @@ export function DeliveriesPage({ role }: { role: Role }) {
               {...wholesalerForm.register('adresse')}
               error={wholesalerForm.formState.errors.adresse?.message}
             />
-            {saveWholesaler.isError && <ErrorState error={saveWholesaler.error} />}
             <Button className="primary" type="submit" disabled={saveWholesaler.isPending}>
               Créer le grossiste
             </Button>
@@ -372,7 +473,11 @@ export function DeliveriesPage({ role }: { role: Role }) {
         </Modal>
       )}
       {productModal && (
-        <Modal title="Ajouter un produit au catalogue" onClose={() => setProductModal(false)}>
+        <Modal
+          title="Ajouter un produit au catalogue"
+          description="Le produit sera créé puis associé à la ligne d’arrivage sélectionnée."
+          onClose={() => setProductModal(false)}
+        >
           <p className="muted">
             Le stock démarre à zéro. La quantité saisie dans l’arrivage sera ajoutée à ce stock.
           </p>
@@ -391,28 +496,35 @@ export function DeliveriesPage({ role }: { role: Role }) {
               {...productForm.register('description')}
               error={productForm.formState.errors.description?.message}
             />
-            <Field
+            <NumberField
+              control={productForm.control}
               label="Prix de vente"
-              min="0.01"
-              step="0.01"
-              type="number"
-              {...productForm.register('prixVente', { valueAsNumber: true })}
+              name="prixVente"
+              min={0.01}
+              step={0.01}
+              decimal
               error={productForm.formState.errors.prixVente?.message}
             />
-            <Field
+            <NumberField
+              control={productForm.control}
               label="Seuil d’alerte"
-              min="0"
-              step="1"
-              type="number"
-              {...productForm.register('seuilAlerte', { valueAsNumber: true })}
+              name="seuilAlerte"
+              min={0}
+              step={1}
               error={productForm.formState.errors.seuilAlerte?.message}
             />
-            {createProduct.isError && <ErrorState error={createProduct.error} />}
             <Button className="primary" type="submit" disabled={createProduct.isPending}>
               {createProduct.isPending ? 'Création…' : 'Créer et ajouter à l’arrivage'}
             </Button>
           </form>
         </Modal>
+      )}
+      {feedback && (
+        <ActionFeedback
+          tone={feedback.tone}
+          message={feedback.message}
+          onClose={() => setFeedback(null)}
+        />
       )}
     </>
   );

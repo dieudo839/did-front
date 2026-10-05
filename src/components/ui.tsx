@@ -6,14 +6,36 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
 } from 'react';
+import { useController, type Control, type FieldPath, type FieldValues } from 'react-hook-form';
+import { Icon, type IconName } from './Icon';
 
 export function Button({ className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button {...props} className={`button ${className}`.trim()} />;
+}
+
+export function IconButton({
+  label,
+  icon,
+  className = '',
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; icon: IconName }) {
+  return (
+    <Button
+      {...props}
+      aria-label={label}
+      className={`icon-button ${className}`.trim()}
+      title={label}
+      type={props.type || 'button'}
+    >
+      <Icon name={icon} />
+    </Button>
+  );
 }
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -57,6 +79,134 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
     </div>
   );
 });
+
+interface NumberFieldProps<T extends FieldValues> {
+  control: Control<T>;
+  name: FieldPath<T>;
+  label: string;
+  error?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  decimal?: boolean;
+}
+
+function formatNumberInput(value: string, decimal: boolean) {
+  const normalized = value.replace(/[\s\u00a0\u202f]/g, '').replace(',', '.');
+  const cleaned = normalized.replace(decimal ? /[^\d.]/g : /\D/g, '');
+  const parts = cleaned.split('.');
+  const integer = parts[0] || '';
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f');
+  const fraction = parts.length > 1 ? `,${parts.slice(1).join('')}` : '';
+  return `${grouped}${fraction}`;
+}
+
+export function NumberField<T extends FieldValues>({
+  control,
+  name,
+  label,
+  error,
+  min = 0,
+  max,
+  step = 1,
+  decimal = false,
+}: NumberFieldProps<T>) {
+  const { field } = useController({ control, name });
+  const [display, setDisplay] = useState(() =>
+    field.value === undefined || field.value === null
+      ? ''
+      : formatNumberInput(String(field.value), decimal),
+  );
+  const fieldId = String(name).replaceAll('.', '-');
+  const errorId = `${fieldId}-error`;
+
+  useEffect(() => {
+    if (document.activeElement !== document.getElementById(fieldId)) {
+      setDisplay(
+        field.value === undefined || field.value === null
+          ? ''
+          : formatNumberInput(String(field.value), decimal),
+      );
+    }
+  }, [decimal, field.value, fieldId]);
+
+  function updateValue(value: string) {
+    const formatted = formatNumberInput(value, decimal);
+    setDisplay(formatted);
+    const parsed = Number(formatted.replace(/[\s\u00a0\u202f]/g, '').replace(',', '.'));
+    field.onChange(formatted && Number.isFinite(parsed) ? parsed : undefined);
+    requestAnimationFrame(() => {
+      const input = document.getElementById(fieldId) as HTMLInputElement | null;
+      input?.setSelectionRange(formatted.length, formatted.length);
+    });
+  }
+
+  return (
+    <div className="field-wrap">
+      <label className="field" htmlFor={fieldId}>
+        <span>{label}</span>
+        <input
+          id={fieldId}
+          name={field.name}
+          ref={field.ref}
+          type="text"
+          inputMode={decimal ? 'decimal' : 'numeric'}
+          autoComplete="off"
+          value={display}
+          min={min}
+          max={max}
+          step={step}
+          onBlur={field.onBlur}
+          onChange={(event) => updateValue(event.target.value)}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+        />
+      </label>
+      {error && (
+        <span className="field-error" id={errorId} role="alert">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function FormattedNumberField({
+  label,
+  value,
+  onValueChange,
+  decimal = false,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  decimal?: boolean;
+  placeholder?: string;
+}) {
+  const fieldId = useId();
+  const display = value ? formatNumberInput(value, decimal) : '';
+
+  return (
+    <div className="field-wrap">
+      <label className="field" htmlFor={fieldId}>
+        <span>{label}</span>
+        <input
+          id={fieldId}
+          type="text"
+          inputMode={decimal ? 'decimal' : 'numeric'}
+          autoComplete="off"
+          placeholder={placeholder}
+          value={display}
+          onChange={(event) => {
+            const formatted = formatNumberInput(event.target.value, decimal);
+            onValueChange(formatted.replace(/[\s\u00a0\u202f]/g, '').replace(',', '.'));
+          }}
+        />
+      </label>
+    </div>
+  );
+}
 
 interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
@@ -185,9 +335,10 @@ export function Toast({
 
 export function LoadingState({ label = 'Chargement en cours…' }: { label?: string }) {
   return (
-    <p className="notice" role="status" aria-live="polite">
-      {label}
-    </p>
+    <div className="loading-state" role="status" aria-live="polite" aria-busy="true">
+      <span className="loading-spinner" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
   );
 }
 
@@ -260,15 +411,20 @@ export function DataTable({
 
 export function Modal({
   title,
+  description,
+  className = '',
   onClose,
   children,
 }: {
   title: string;
+  description?: string;
+  className?: string;
   onClose: () => void;
   children: ReactNode;
 }) {
   const dialogRef = useRef<HTMLElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
+  const titleId = useId();
 
   useEffect(() => {
     previousFocus.current = document.activeElement as HTMLElement | null;
@@ -316,25 +472,21 @@ export function Modal({
     <div className="modal-backdrop" onMouseDown={onClose}>
       <section
         ref={dialogRef}
-        className="modal"
+        className={`modal ${className}`.trim()}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={titleId}
         tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="modal-heading">
-          <h2 id="modal-title">{title}</h2>
-          <button
-            className="button text-button"
-            type="button"
-            onClick={onClose}
-            aria-label="Fermer"
-          >
-            Fermer
-          </button>
+          <div className="modal-title-group">
+            <h2 id={titleId}>{title}</h2>
+            {description && <p className="modal-description">{description}</p>}
+          </div>
+          <IconButton className="modal-close" icon="close" label="Fermer" onClick={onClose} />
         </div>
-        {children}
+        <div className="modal-body">{children}</div>
       </section>
     </div>
   );
@@ -358,9 +510,14 @@ export function ConfirmationModal({
   danger?: boolean;
 }) {
   return (
-    <Modal title={title} onClose={onCancel}>
+    <Modal className="confirmation-modal" title={title} onClose={onCancel}>
       <div className="confirmation-content">
-        <p>{description}</p>
+        <div className="confirmation-message">
+          <span className={danger ? 'confirmation-symbol danger' : 'confirmation-symbol'}>
+            <Icon name={danger ? 'warning' : 'activate'} />
+          </span>
+          <p>{description}</p>
+        </div>
         <div className="confirmation-actions">
           <Button type="button" onClick={onCancel} disabled={pending}>
             Annuler
@@ -371,9 +528,58 @@ export function ConfirmationModal({
             onClick={onConfirm}
             disabled={pending}
           >
+            {danger && <Icon name="trash" />}
             {pending ? 'En cours…' : confirmLabel}
           </Button>
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+export function ActionFeedback({
+  tone,
+  message,
+  onClose,
+}: {
+  tone: 'success' | 'error';
+  message: string;
+  onClose: () => void;
+}) {
+  const closeRef = useRef(onClose);
+
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (tone !== 'success') {
+      return;
+    }
+
+    const timer = window.setTimeout(() => closeRef.current(), 6000);
+    return () => window.clearTimeout(timer);
+  }, [message, tone]);
+
+  return (
+    <Modal
+      className={`action-feedback-modal feedback-${tone}`}
+      title={tone === 'success' ? 'Action réussie' : 'Action impossible'}
+      onClose={onClose}
+    >
+      <div className="action-feedback-content" role={tone === 'error' ? 'alert' : 'status'}>
+        <span className="action-feedback-symbol" aria-hidden="true">
+          <Icon name={tone === 'success' ? 'success' : 'warning'} />
+        </span>
+        <p>{message}</p>
+      </div>
+      {tone === 'success' && (
+        <p className="action-feedback-note">Cette fenêtre se fermera automatiquement.</p>
+      )}
+      <div className="confirmation-actions">
+        <Button className={tone === 'success' ? 'primary' : ''} type="button" onClick={onClose}>
+          Fermer
+        </Button>
       </div>
     </Modal>
   );

@@ -5,12 +5,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Heading, Pager } from '../components/layout';
 import {
+  ActionFeedback,
   Button,
   ConfirmationModal,
   DataTable,
   EmptyState,
   ErrorState,
   Field,
+  IconButton,
   LoadingState,
   Modal,
   SelectField,
@@ -37,7 +39,10 @@ export function UsersPage() {
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<User | null | false>(false);
   const [userToChangeStatus, setUserToChangeStatus] = useState<User | null>(null);
-  const [message, setMessage] = useState('');
+  const [feedback, setFeedback] = useState<{
+    tone: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const users = useQuery({ queryKey: ['users', page], queryFn: () => api.users(page) });
   const form = useForm<UserValues>({ resolver: zodResolver(userSchema), defaultValues: blankUser });
   const save = useMutation({
@@ -45,30 +50,34 @@ export function UsersPage() {
       editing ? api.updateUser(editing.id, body) : api.createUser(body),
     onSuccess: (user) => {
       setUserToChangeStatus(null);
-      setMessage(`Compte ${user.identifiant} enregistré.`);
+      setFeedback({ tone: 'success', message: `Compte ${user.identifiant} enregistré.` });
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (error) => applyApiFieldErrors(error, form.setError),
+    onError: (error) => {
+      applyApiFieldErrors(error, form.setError);
+      setFeedback({ tone: 'error', message: apiErrorMessage(error) });
+    },
   });
   const status = useMutation({
     mutationFn: ({ id, actif }: { id: string; actif: boolean }) => api.setUserStatus(id, actif),
     onSuccess: (user) => {
-      setMessage(
-        user.actif
+      setFeedback({
+        tone: 'success',
+        message: user.actif
           ? `Compte ${user.identifiant} réactivé.`
           : `Compte ${user.identifiant} désactivé.`,
-      );
+      });
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (error) => {
       setUserToChangeStatus(null);
-      setMessage(apiErrorMessage(error));
+      setFeedback({ tone: 'error', message: apiErrorMessage(error) });
     },
   });
 
   function openUser(user: User | null) {
-    setMessage('');
+    setFeedback(null);
     setEditing(user);
     form.reset(
       user
@@ -98,11 +107,6 @@ export function UsersPage() {
           </Button>
         }
       />
-      {message && (
-        <p className="success form-message" role="status">
-          {message}
-        </p>
-      )}
       {users.isLoading ? (
         <LoadingState label="On ouvre le registre de l’équipe…" />
       ) : users.error ? (
@@ -126,16 +130,18 @@ export function UsersPage() {
                 <Tag danger={!user.actif}>{user.actif ? 'ACTIF' : 'DÉSACTIVÉ'}</Tag>
               </td>
               <td className="row-actions">
-                <button type="button" onClick={() => openUser(user)}>
-                  Modifier
-                </button>
-                <button
-                  type="button"
+                <IconButton
+                  icon="edit"
+                  label={`Modifier ${user.prenom} ${user.nom}`}
+                  onClick={() => openUser(user)}
+                />
+                <IconButton
+                  className={user.actif ? 'danger-icon' : ''}
+                  icon={user.actif ? 'deactivate' : 'activate'}
+                  label={`${user.actif ? 'Désactiver' : 'Réactiver'} ${user.prenom} ${user.nom}`}
                   disabled={status.isPending}
                   onClick={() => setUserToChangeStatus(user)}
-                >
-                  {user.actif ? 'Désactiver' : 'Réactiver'}
-                </button>
+                />
               </td>
             </tr>
           ))}
@@ -178,6 +184,7 @@ export function UsersPage() {
       {editing !== false && (
         <Modal
           title={editing ? 'Modifier le compte' : 'Nouveau compte'}
+          description="Les informations de connexion et le rôle déterminent l’accès à la boutique."
           onClose={() => setEditing(false)}
         >
           <form
@@ -238,12 +245,18 @@ export function UsersPage() {
               <input type="checkbox" {...form.register('actif')} />
               <span>Compte actif</span>
             </label>
-            {save.isError && <ErrorState error={save.error} />}
             <Button className="primary" type="submit" disabled={save.isPending}>
               {save.isPending ? 'Enregistrement…' : 'Enregistrer le compte'}
             </Button>
           </form>
         </Modal>
+      )}
+      {feedback && (
+        <ActionFeedback
+          tone={feedback.tone}
+          message={feedback.message}
+          onClose={() => setFeedback(null)}
+        />
       )}
     </>
   );

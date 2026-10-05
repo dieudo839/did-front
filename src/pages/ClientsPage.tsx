@@ -7,6 +7,7 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  FormattedNumberField,
   LoadingState,
   SelectField,
 } from '../components/ui';
@@ -20,6 +21,8 @@ export function ClientsPage() {
   const [term, setTerm] = useState('');
   const [phoneSearch, setPhoneSearch] = useState('');
   const [phoneTerm, setPhoneTerm] = useState('');
+  const [minimumPurchases, setMinimumPurchases] = useState('');
+  const [minimumPurchasesFilter, setMinimumPurchasesFilter] = useState('');
   const [frequents, setFrequents] = useState(false);
   const [page, setPage] = useState(0);
 
@@ -27,17 +30,19 @@ export function ClientsPage() {
     const timer = window.setTimeout(() => {
       setTerm(search.trim());
       setPhoneTerm(phoneSearch.trim());
+      setMinimumPurchasesFilter(minimumPurchases);
       setPage(0);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [search, phoneSearch]);
+  }, [search, phoneSearch, minimumPurchases]);
 
   const clients = useQuery({
-    queryKey: ['contacts', 'clients', page, term, phoneTerm, frequents],
+    queryKey: ['contacts', 'clients', page, term, phoneTerm, frequents, minimumPurchasesFilter],
     queryFn: () =>
       api.clients(term, page, 10, {
         telephone: phoneTerm,
         frequents,
+        achatsMinimum: minimumPurchasesFilter || undefined,
       }),
     enabled: tab === 'clients',
   });
@@ -94,6 +99,12 @@ export function ClientsPage() {
               onChange={(event) => setPhoneSearch(event.target.value)}
               placeholder="Filtrer par téléphone"
               value={phoneSearch}
+            />
+            <FormattedNumberField
+              label="Achats minimum"
+              onValueChange={setMinimumPurchases}
+              placeholder="Sans minimum"
+              value={minimumPurchases}
             />
             <SelectField
               aria-describedby="clients-sort-help"

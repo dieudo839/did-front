@@ -81,11 +81,21 @@ export function Shell({
           </Link>
         </nav>
         <div className="identity">
-          <Link to="/profil" onClick={closeMenu}>
-            <span className="identity-name">
-              {session.utilisateur.prenom} {session.utilisateur.nom}
+          <Link className="identity-link" to="/profil" onClick={closeMenu}>
+            <span className="identity-avatar" aria-hidden="true">
+              {`${session.utilisateur.prenom.charAt(0)}${session.utilisateur.nom.charAt(0)}`.toLocaleUpperCase(
+                'fr-FR',
+              )}
             </span>
-            <small>{session.utilisateur.role === 'ADMIN' ? 'Administrateur' : 'Vendeur'}</small>
+            <span className="identity-copy">
+              <span className="identity-name">
+                {session.utilisateur.prenom} {session.utilisateur.nom}
+              </span>
+              <small>
+                {session.utilisateur.role === 'ADMIN' ? 'Administrateur' : 'Vendeur'} · @
+                {session.utilisateur.identifiant}
+              </small>
+            </span>
           </Link>
           <button onClick={onLogout} className="logout" type="button">
             Se déconnecter

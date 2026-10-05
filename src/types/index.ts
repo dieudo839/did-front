@@ -132,6 +132,14 @@ export interface UserRequest {
   actif: boolean;
 }
 
+export interface ProfileRequest {
+  nom: string;
+  prenom: string;
+  matricule: string;
+  sexe: 'M' | 'F';
+  dateNaissance: string;
+}
+
 export interface ClientRequest {
   nom: string;
   prenom: string;

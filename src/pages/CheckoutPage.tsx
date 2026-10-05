@@ -12,12 +12,15 @@ import { api } from '../api';
 import { Heading, Pager } from '../components/layout';
 import { Receipt } from '../components/Receipt';
 import {
+  ActionFeedback,
   Button,
   EmptyState,
   ErrorState,
   Field,
+  IconButton,
   LoadingState,
   Modal,
+  NumberField,
   SelectField,
 } from '../components/ui';
 import { apiErrorMessage, applyApiFieldErrors } from '../forms';
@@ -36,7 +39,10 @@ export function CheckoutPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Record<string, Product>>({});
   const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [message, setMessage] = useState('');
+  const [feedback, setFeedback] = useState<{
+    tone: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [clientModal, setClientModal] = useState(false);
   const productsQuery = useQuery({
     queryKey: ['products', 'checkout', search, productPage, productPageSize],
@@ -67,19 +73,22 @@ export function CheckoutPage() {
       form.reset({ clientId: null, lignes: [] });
       setSelectedClient(null);
       setSelectedProducts({});
-      setMessage('Vente enregistrée. Le serveur a calculé le total définitif.');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['revenue'] });
       queryClient.invalidateQueries({ queryKey: ['top-products'] });
       try {
         setTicket(await api.ticket(purchase.id));
       } catch (error) {
-        setMessage(
-          `Vente enregistrée, mais le ticket n'a pas pu être chargé. ${apiErrorMessage(error)}`,
-        );
+        setFeedback({
+          tone: 'error',
+          message: `La vente est enregistrée, mais le ticket n’a pas pu être chargé. ${apiErrorMessage(error)}`,
+        });
       }
     },
-    onError: (error) => applyApiFieldErrors(error, form.setError),
+    onError: (error) => {
+      applyApiFieldErrors(error, form.setError);
+      setFeedback({ tone: 'error', message: apiErrorMessage(error) });
+    },
   });
   const clientCreate = useForm<ClientRequest>({
     resolver: zodResolver(clientSchema),
@@ -93,11 +102,21 @@ export function CheckoutPage() {
       setClientSearch(`${client.prenom || ''} ${client.nom}`.trim());
       setClientPickerOpen(false);
       setClientModal(false);
+      setFeedback({ tone: 'success', message: `${client.nom} a été ajouté aux clients.` });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       clientCreate.reset();
     },
-    onError: (error) => applyApiFieldErrors(error, clientCreate.setError),
+    onError: (error) => {
+      applyApiFieldErrors(error, clientCreate.setError);
+      setFeedback({ tone: 'error', message: apiErrorMessage(error) });
+    },
   });
+
+  function openClientModal() {
+    clientCreate.reset({ nom: '', prenom: '', telephone: '' });
+    setClientPickerOpen(false);
+    setClientModal(true);
+  }
 
   function addProduct(product: Product) {
     setSelectedProducts((current) => ({ ...current, [product.id]: product }));
@@ -130,7 +149,7 @@ export function CheckoutPage() {
       if (firstClient) {
         selectClient(firstClient);
       } else if (clientSearch.trim() && clientsQuery.isSuccess) {
-        setClientModal(true);
+        openClientModal();
       }
     }
     if (event.key === 'Escape') {
@@ -154,7 +173,7 @@ export function CheckoutPage() {
   }, []);
 
   const submit = form.handleSubmit((values) => {
-    setMessage('');
+    setFeedback(null);
     sale.mutate(values);
   });
 
@@ -169,7 +188,7 @@ export function CheckoutPage() {
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
-      setMessage(apiErrorMessage(error));
+      setFeedback({ tone: 'error', message: apiErrorMessage(error) });
     }
   }
 
@@ -199,7 +218,6 @@ export function CheckoutPage() {
               type="button"
               onClick={() => {
                 setTicket(null);
-                setMessage('');
               }}
             >
               Nouvelle vente ↗
@@ -281,25 +299,36 @@ export function CheckoutPage() {
             </p>
             <h2>À régler</h2>
             <div className="customer-picker">
-              <Field
-                aria-autocomplete="list"
-                aria-controls={clientPickerOpen ? 'client-options' : undefined}
-                aria-expanded={clientPickerOpen && !selectedClient}
-                aria-haspopup="listbox"
-                label="Client (facultatif)"
-                name="client-search"
-                value={clientSearch}
-                onChange={(event) => {
-                  setClientSearch(event.target.value);
-                  setSelectedClient(null);
-                  form.setValue('clientId', null);
-                  setClientPickerOpen(true);
-                }}
-                onFocus={() => setClientPickerOpen(true)}
-                onKeyDown={handleClientKeyDown}
-                placeholder="Chercher un client par nom"
-                autoComplete="off"
-              />
+              <div className="customer-picker-control">
+                <Field
+                  aria-autocomplete="list"
+                  aria-controls={clientPickerOpen ? 'client-options' : undefined}
+                  aria-expanded={clientPickerOpen && !selectedClient}
+                  aria-haspopup="listbox"
+                  label="Client (facultatif)"
+                  name="client-search"
+                  value={clientSearch}
+                  onChange={(event) => {
+                    setClientSearch(event.target.value);
+                    setSelectedClient(null);
+                    form.setValue('clientId', null);
+                    setClientPickerOpen(true);
+                  }}
+                  onFocus={() => setClientPickerOpen(true)}
+                  onKeyDown={handleClientKeyDown}
+                  placeholder="Chercher un client par nom"
+                  autoComplete="off"
+                />
+                {!selectedClient && (
+                  <button
+                    className="text-button customer-add-button"
+                    onClick={openClientModal}
+                    type="button"
+                  >
+                    + Nouveau client
+                  </button>
+                )}
+              </div>
               {clientPickerOpen && !selectedClient && (
                 <>
                   {clientsQuery.isLoading ? (
@@ -337,13 +366,6 @@ export function CheckoutPage() {
                   ) : clientSearch.trim() && clientsQuery.isSuccess ? (
                     <div className="supplier-no-results" role="status">
                       <span>Aucun client ne correspond à cette recherche.</span>
-                      <button
-                        type="button"
-                        className="text-button"
-                        onClick={() => setClientModal(true)}
-                      >
-                        Créer cette fiche client
-                      </button>
                     </div>
                   ) : (
                     <p className="supplier-search-status" role="status">
@@ -398,25 +420,23 @@ export function CheckoutPage() {
                         {product?.nom || 'Article'}
                         <small>{money(product?.prixVente || 0)} / unité</small>
                       </span>
-                      <Field
+                      <NumberField
+                        control={form.control}
                         label="Qté"
-                        aria-label={`Quantité ${product?.nom || 'de cet article'}`}
-                        type="number"
-                        min="1"
+                        min={1}
                         max={product?.stockActuel}
-                        {...form.register(`lignes.${index}.quantite`, { valueAsNumber: true })}
+                        step={1}
+                        name={`lignes.${index}.quantite`}
                         error={form.formState.errors.lignes?.[index]?.quantite?.message}
                       />
                       <b className="mono">
                         {money((product?.prixVente || 0) * (watchedLines[index]?.quantite || 0))}
                       </b>
-                      <button
-                        type="button"
-                        aria-label={`Retirer ${product?.nom || 'ce produit'}`}
+                      <IconButton
+                        icon="remove"
+                        label={`Retirer ${product?.nom || 'ce produit'} du panier`}
                         onClick={() => lines.remove(index)}
-                      >
-                        ×
-                      </button>
+                      />
                     </div>
                   );
                 })}
@@ -431,12 +451,6 @@ export function CheckoutPage() {
               <span>TOTAL INDICATIF</span>
               <strong>{money(totalIndicatif)}</strong>
             </div>
-            {sale.isError && <ErrorState error={sale.error} />}
-            {message && (
-              <p className="success" role="status">
-                {message}
-              </p>
-            )}
             <Button
               className="primary full"
               type="submit"
@@ -452,7 +466,11 @@ export function CheckoutPage() {
       )}
 
       {clientModal && (
-        <Modal title="Nouvelle fiche client" onClose={() => setClientModal(false)}>
+        <Modal
+          title="Nouveau client pour cette vente"
+          description="Créez sa fiche pour l’associer immédiatement à l’achat."
+          onClose={() => setClientModal(false)}
+        >
           <form
             className="editor-form"
             onSubmit={clientCreate.handleSubmit((values) => createClient.mutate(values))}
@@ -473,12 +491,18 @@ export function CheckoutPage() {
               {...clientCreate.register('telephone')}
               error={clientCreate.formState.errors.telephone?.message}
             />
-            {createClient.isError && <ErrorState error={createClient.error} />}
             <Button className="primary" type="submit" disabled={createClient.isPending}>
               Créer le client
             </Button>
           </form>
         </Modal>
+      )}
+      {feedback && (
+        <ActionFeedback
+          tone={feedback.tone}
+          message={feedback.message}
+          onClose={() => setFeedback(null)}
+        />
       )}
     </>
   );

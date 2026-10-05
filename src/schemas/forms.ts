@@ -73,6 +73,18 @@ export const passwordSchema = z
     message: 'Les deux mots de passe ne correspondent pas.',
   });
 
+export const profileSchema = z.object({
+  nom: z.string().trim().min(1, 'Saisissez le nom.').max(100),
+  prenom: z.string().trim().min(1, 'Saisissez le prénom.').max(100),
+  matricule: z.string().trim().min(1, 'Saisissez le matricule.').max(50),
+  sexe: z.enum(['M', 'F'], { error: 'Choisissez le sexe.' }),
+  dateNaissance: z
+    .string()
+    .min(1, 'Saisissez la date de naissance.')
+    .refine((value) => !Number.isNaN(Date.parse(value)), 'Date invalide.')
+    .refine((value) => new Date(value) < new Date(), 'La date doit être passée.'),
+});
+
 export const clientSchema = z.object({
   nom: z.string().trim().min(1, 'Saisissez le nom.').max(100),
   prenom: z.string().max(100),
@@ -91,3 +103,4 @@ export type UserValues = z.infer<typeof userSchema>;
 export type PurchaseValues = z.infer<typeof purchaseSchema>;
 export type DeliveryValues = z.infer<typeof deliverySchema>;
 export type PasswordValues = z.infer<typeof passwordSchema>;
+export type ProfileValues = z.infer<typeof profileSchema>;
