@@ -1642,6 +1642,39 @@ tbody tr:hover {
   margin-bottom: var(--space-0);
 }
 
+.delivery-product-picker {
+  position: relative;
+}
+
+.delivery-product-options {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% - var(--space-4));
+  right: var(--space-0);
+  left: var(--space-0);
+  max-height: var(--dropdown-max-height);
+  overflow-y: auto;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.delivery-product-options .suggestion {
+  border: 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.delivery-product-options .suggestion:last-child {
+  border-bottom: 0;
+}
+
+.delivery-product-status {
+  margin: var(--space-0);
+  padding: var(--space-3);
+  color: var(--color-secondary);
+  font-size: var(--text-sm);
+}
+
 .delivery-line .field-label,
 .delivery-line .field > span:first-child {
   display: flex;

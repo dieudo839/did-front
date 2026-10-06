@@ -153,7 +153,7 @@ export function ClientsPage() {
                 </tr>
               ))}
             </DataTable>
-            <Pager page={page} pages={clients.data.totalPages} setPage={setPage} />
+            <Pager page={page} pages={clients.data.page.totalPages} setPage={setPage} />
           </>
         ) : (
           <EmptyState>
@@ -180,7 +180,7 @@ export function ClientsPage() {
               </tr>
             ))}
           </DataTable>
-          <Pager page={page} pages={wholesalers.data.totalPages} setPage={setPage} />
+          <Pager page={page} pages={wholesalers.data.page.totalPages} setPage={setPage} />
         </>
       ) : (
         <EmptyState>

@@ -25,6 +25,165 @@ import {
 import type { Grossiste, GrossisteRequest, Page, Product, ProductRequest, Role } from '../types';
 import { money } from '../utils';
 
+function DeliveryProductPicker({
+  id,
+  lineNumber,
+  value,
+  error,
+  onChange,
+}: {
+  id: string;
+  lineNumber: number;
+  value: string;
+  error?: string;
+  onChange: (productId: string) => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [search, setSearch] = useState('');
+  const [term, setTerm] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const products = useQuery({
+    queryKey: ['products', 'delivery-search', term],
+    queryFn: () => api.products(0, term, 20),
+    enabled: focused,
+  });
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setTerm(search.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
+    if (!value) {
+      setSelectedProduct(null);
+    }
+  }, [value]);
+
+  const options = products.data?.content || [];
+  const displayValue = focused ? search : selectedProduct?.nom || '';
+  const optionsId = `${id}-options`;
+  const errorId = `${id}-error`;
+
+  function selectProduct(product: Product) {
+    setSelectedProduct(product);
+    setSearch(product.nom);
+    onChange(product.id);
+    setFocused(false);
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'ArrowDown' && options.length > 0) {
+      event.preventDefault();
+      document.getElementById(`${optionsId}-0`)?.focus();
+    }
+
+    if (event.key === 'Enter' && options[0]) {
+      event.preventDefault();
+      selectProduct(options[0]);
+    }
+
+    if (event.key === 'Escape') {
+      setFocused(false);
+      setSearch(selectedProduct?.nom || '');
+    }
+  }
+
+  return (
+    <div
+      className="field-wrap delivery-product-picker"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setFocused(false);
+        }
+      }}
+    >
+      <label className="field" htmlFor={id}>
+        <span>Produit</span>
+        <input
+          id={id}
+          type="search"
+          role="combobox"
+          aria-label={`Rechercher un produit pour la ligne ${lineNumber}`}
+          aria-autocomplete="list"
+          aria-controls={optionsId}
+          aria-expanded={focused}
+          aria-haspopup="listbox"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          autoComplete="off"
+          placeholder="Rechercher un produit…"
+          value={displayValue}
+          onFocus={() => {
+            setSearch(selectedProduct?.nom || '');
+            setFocused(true);
+          }}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setSelectedProduct(null);
+            onChange('');
+          }}
+          onKeyDown={handleKeyDown}
+        />
+      </label>
+      {focused && (
+        <div className="delivery-product-options" id={optionsId} role="listbox">
+          {term !== search.trim() || products.isLoading ? (
+            <p className="delivery-product-status" role="status">
+              Recherche des produits…
+            </p>
+          ) : products.isError ? (
+            <p className="delivery-product-status field-error" role="alert">
+              Impossible de charger les produits.
+            </p>
+          ) : options.length ? (
+            options.map((product, index) => (
+              <button
+                id={`${optionsId}-${index}`}
+                aria-selected={product.id === value}
+                className="suggestion"
+                key={product.id}
+                onClick={() => selectProduct(product)}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    document.getElementById(`${optionsId}-${index + 1}`)?.focus();
+                  }
+                  if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (index === 0) {
+                      document.getElementById(id)?.focus();
+                    } else {
+                      document.getElementById(`${optionsId}-${index - 1}`)?.focus();
+                    }
+                  }
+                  if (event.key === 'Escape') {
+                    setFocused(false);
+                    document.getElementById(id)?.focus();
+                  }
+                }}
+                role="option"
+                type="button"
+              >
+                <span>{product.nom}</span>
+                <small>{product.stockActuel} en stock</small>
+              </button>
+            ))
+          ) : (
+            <p className="delivery-product-status" role="status">
+              Aucun produit ne correspond à cette recherche.
+            </p>
+          )}
+        </div>
+      )}
+      {error && (
+        <span className="field-error" id={errorId} role="alert">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
 const emptyProduct: ProductValues = {
   nom: '',
   description: '',
@@ -139,7 +298,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
 
         return {
           ...page,
-          content: [product, ...page.content].slice(0, page.size),
+          content: [product, ...page.content].slice(0, page.page.size),
         };
       });
       if (productLineIndex !== null) {
@@ -338,39 +497,18 @@ export function DeliveriesPage({ role }: { role: Role }) {
                     )}
                   </div>
                   <div className="delivery-line">
-                    <div className="field-wrap">
-                      <label className="field-label" htmlFor={`delivery-product-${index}`}>
-                        Produit
-                      </label>
-                      <select
-                        className="field-select"
-                        id={`delivery-product-${index}`}
-                        aria-label={`Produit pour ligne ${index + 1}`}
-                        aria-invalid={Boolean(form.formState.errors.lignes?.[index]?.produitId)}
-                        aria-describedby={
-                          form.formState.errors.lignes?.[index]?.produitId
-                            ? `line-product-${index}-error`
-                            : undefined
-                        }
-                        {...form.register(`lignes.${index}.produitId`)}
-                      >
-                        <option value="">Choisir un produit</option>
-                        {products.data?.content.map((product: Product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.nom}
-                          </option>
-                        ))}
-                      </select>
-                      {form.formState.errors.lignes?.[index]?.produitId?.message && (
-                        <span
-                          className="field-error"
-                          id={`line-product-${index}-error`}
-                          role="alert"
-                        >
-                          {form.formState.errors.lignes[index]?.produitId?.message}
-                        </span>
-                      )}
-                    </div>
+                    <DeliveryProductPicker
+                      id={`delivery-product-${row.id}`}
+                      lineNumber={index + 1}
+                      value={watched[index]?.produitId || ''}
+                      error={form.formState.errors.lignes?.[index]?.produitId?.message}
+                      onChange={(productId) =>
+                        form.setValue(`lignes.${index}.produitId`, productId, {
+                          shouldDirty: true,
+                          shouldValidate: Boolean(productId),
+                        })
+                      }
+                    />
                     <NumberField
                       control={form.control}
                       label="Quantité reçue"

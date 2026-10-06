@@ -288,10 +288,10 @@ export function HistoryPage() {
         <EmptyState>Aucun arrivage ne correspond à ces filtres.</EmptyState>
       )}
       {register === 'ventes' && (
-        <Pager page={page} pages={purchases.data?.totalPages || 0} setPage={setPage} />
+        <Pager page={page} pages={purchases.data?.page.totalPages || 0} setPage={setPage} />
       )}
       {register === 'arrivages' && (
-        <Pager page={page} pages={deliveries.data?.totalPages || 0} setPage={setPage} />
+        <Pager page={page} pages={deliveries.data?.page.totalPages || 0} setPage={setPage} />
       )}
     </>
   );

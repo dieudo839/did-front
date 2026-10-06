@@ -149,7 +149,7 @@ export function UsersPage() {
       ) : (
         <EmptyState>Aucun compte dans le registre.</EmptyState>
       )}
-      <Pager page={page} pages={users.data?.totalPages || 0} setPage={setPage} />
+      <Pager page={page} pages={users.data?.page.totalPages || 0} setPage={setPage} />
       {userToChangeStatus && (
         <ConfirmationModal
           title={userToChangeStatus.actif ? 'Désactiver ce compte ?' : 'Réactiver ce compte ?'}

@@ -340,7 +340,7 @@ export function ProductsPage({ role }: { role: Role }) {
       ) : (
         <EmptyState>Aucun produit dans ce rayon.</EmptyState>
       )}
-      <Pager page={page} pages={products.data?.totalPages || 0} setPage={setPage} />
+      <Pager page={page} pages={products.data?.page.totalPages || 0} setPage={setPage} />
       {productToDelete && (
         <ConfirmationModal
           title="Supprimer ce produit ?"

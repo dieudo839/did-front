@@ -85,9 +85,9 @@ async function fetchAllPurchases(range: DateRange) {
   const first = await api.purchases(0, filters);
   const purchases = [...first.content];
 
-  for (let firstPage = 1; firstPage < first.totalPages; firstPage += 5) {
+  for (let firstPage = 1; firstPage < first.page.totalPages; firstPage += 5) {
     const pages = Array.from(
-      { length: Math.min(5, first.totalPages - firstPage) },
+      { length: Math.min(5, first.page.totalPages - firstPage) },
       (_, index) => firstPage + index,
     );
     const results = await Promise.all(pages.map((page) => api.purchases(page, filters)));
@@ -100,9 +100,9 @@ async function fetchAllPurchases(range: DateRange) {
 async function fetchInactiveUsers() {
   const first = await api.users(0);
   const users = [...first.content];
-  for (let firstPage = 1; firstPage < first.totalPages; firstPage += 5) {
+  for (let firstPage = 1; firstPage < first.page.totalPages; firstPage += 5) {
     const pages = Array.from(
-      { length: Math.min(5, first.totalPages - firstPage) },
+      { length: Math.min(5, first.page.totalPages - firstPage) },
       (_, index) => firstPage + index,
     );
     const results = await Promise.all(pages.map((page) => api.users(page)));
@@ -240,7 +240,7 @@ export function DashboardPage() {
     : recentDeliveries.isError
       ? formatError(recentDeliveries.error)
       : undefined;
-  const stockCount = stock.data?.totalElements || 0;
+  const stockCount = stock.data?.page.totalElements || 0;
   const inactiveCount = isAdmin && inactive.isSuccess ? inactive.data : 0;
   const attentionCount =
     stock.isSuccess && (!isAdmin || inactive.isSuccess)

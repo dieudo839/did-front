@@ -285,7 +285,7 @@ export function CheckoutPage() {
                 </div>
                 <Pager
                   page={productPage}
-                  pages={productsQuery.data.totalPages}
+                  pages={productsQuery.data.page.totalPages}
                   setPage={setProductPage}
                 />
               </div>

@@ -29,10 +29,12 @@ export interface Product {
 
 export interface Page<T> {
   content: T[];
-  totalPages: number;
-  number: number;
-  totalElements: number;
-  size: number;
+  page: {
+    size: number;
+    number: number;
+    totalElements: number;
+    totalPages: number;
+  };
 }
 
 export interface Client {
