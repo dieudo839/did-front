@@ -47,12 +47,14 @@ export function ActiviteRecente({
   error,
   partialError,
   onRetry,
+  audience,
 }: {
   activities: DashboardActivity[];
   loading?: boolean;
   error?: string;
   partialError?: string;
   onRetry?: () => void;
+  audience: 'team' | 'personal';
 }) {
   return (
     <section className="dashboard-panel activity-panel" aria-labelledby="activity-title">
@@ -62,6 +64,9 @@ export function ActiviteRecente({
           <p>Achats et livraisons enregistrés</p>
         </div>
       </div>
+      <p className="activity-scope">
+        {audience === 'team' ? 'Opérations de toute l’équipe' : 'Vos opérations uniquement'}
+      </p>
       {loading ? (
         <div className="activity-skeleton" aria-label="Chargement de l’activité" role="status">
           {Array.from({ length: 5 }, (_, index) => (
@@ -109,9 +114,14 @@ export function ActiviteRecente({
                 <OperationIcon type={activity.type} />
                 <span className="activity-description">
                   <span>{activity.label}</span>
+                  <span className="activity-operator">
+                    Créé par {activity.creerPar || 'system'}
+                  </span>
                   <time dateTime={activity.date}>{relativeTime(activity.date)}</time>
                 </span>
-                <strong className="amount">{money(activity.total)}</strong>
+                {activity.total !== null && (
+                  <strong className="amount">{money(activity.total)}</strong>
+                )}
               </li>
             ))}
           </ol>

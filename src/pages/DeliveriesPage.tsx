@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useFieldArray, useForm, useWatch } from 'react-hook-form';
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
@@ -14,6 +14,7 @@ import {
   NumberField,
 } from '../components/ui';
 import { Heading } from '../components/layout';
+import { PhoneField } from '../components/PhoneField';
 import { apiErrorMessage, applyApiFieldErrors } from '../forms';
 import {
   deliverySchema,
@@ -31,12 +32,14 @@ function DeliveryProductPicker({
   value,
   error,
   onChange,
+  onProductSelect,
 }: {
   id: string;
   lineNumber: number;
   value: string;
   error?: string;
   onChange: (productId: string) => void;
+  onProductSelect: (product: Product) => void;
 }) {
   const [focused, setFocused] = useState(false);
   const [search, setSearch] = useState('');
@@ -68,6 +71,7 @@ function DeliveryProductPicker({
     setSelectedProduct(product);
     setSearch(product.nom);
     onChange(product.id);
+    onProductSelect(product);
     setFocused(false);
   }
 
@@ -188,6 +192,7 @@ const emptyProduct: ProductValues = {
   nom: '',
   description: '',
   prixVente: 0,
+  prixAchat: 0,
   stockActuel: 0,
   seuilAlerte: 5,
 };
@@ -197,10 +202,12 @@ export function DeliveriesPage({ role }: { role: Role }) {
   const queryClient = useQueryClient();
   const [wholesalerSearch, setWholesalerSearch] = useState('');
   const [wholesalerTerm, setWholesalerTerm] = useState('');
+  const [wholesalerListOpen, setWholesalerListOpen] = useState(false);
   const [selectedWholesaler, setSelectedWholesaler] = useState<Grossiste | null>(null);
   const [wholesalerModal, setWholesalerModal] = useState(false);
   const [productModal, setProductModal] = useState(false);
   const [productLineIndex, setProductLineIndex] = useState<number | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, Product>>({});
   const [feedback, setFeedback] = useState<{
     tone: 'success' | 'error';
     message: string;
@@ -217,13 +224,21 @@ export function DeliveriesPage({ role }: { role: Role }) {
   const wholesalers = useQuery({
     queryKey: ['wholesalers', wholesalerTerm],
     queryFn: () => api.wholesalers(wholesalerTerm),
-    enabled: Boolean(wholesalerTerm) && !selectedWholesaler,
+    enabled: wholesalerListOpen && !selectedWholesaler,
   });
   const form = useForm<DeliveryValues>({
     resolver: zodResolver(deliverySchema),
+    mode: 'onChange',
     defaultValues: {
       grossisteId: '',
-      lignes: [{ produitId: '', quantite: 1, prixAchatUnitaire: 0 }],
+      lignes: [
+        {
+          produitId: '',
+          quantite: 1,
+          prixAchatUnitaire: 0,
+          mettreAJourPrixVente: false,
+        },
+      ],
     },
   });
   const productForm = useForm<ProductValues>({
@@ -245,6 +260,23 @@ export function DeliveriesPage({ role }: { role: Role }) {
     (total, line) => total + (Number.isFinite(line.quantite) ? line.quantite : 0),
     0,
   );
+  const incompleteLineIndex = watched.findIndex(
+    (line) =>
+      !line.produitId ||
+      !Number.isFinite(line.quantite) ||
+      line.quantite <= 0 ||
+      !Number.isFinite(line.prixAchatUnitaire) ||
+      line.prixAchatUnitaire <= 0,
+  );
+  const incompleteMessage = !selectedWholesaler
+    ? 'Sélectionnez un grossiste pour continuer.'
+    : incompleteLineIndex >= 0
+      ? `Complétez la ligne ${incompleteLineIndex + 1} : produit, quantité et prix d'achat.`
+      : null;
+  const percentageFormatter = new Intl.NumberFormat('fr-FR', {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  });
   const wholesalerForm = useForm<GrossisteRequest>({
     resolver: zodResolver(wholesalerSchema),
     defaultValues: { nom: '', telephone: '', adresse: '' },
@@ -254,6 +286,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
     onSuccess: (wholesaler) => {
       setSelectedWholesaler(wholesaler);
       setWholesalerSearch(wholesaler.nom);
+      setWholesalerListOpen(false);
       form.setValue('grossisteId', wholesaler.id, { shouldValidate: true });
       setWholesalerModal(false);
       setFeedback({ tone: 'success', message: `${wholesaler.nom} a été ajouté au carnet.` });
@@ -270,12 +303,23 @@ export function DeliveriesPage({ role }: { role: Role }) {
     onSuccess: (delivery) => {
       setFeedback({
         tone: 'success',
-        message: `Arrivage de ${delivery.grossiste} enregistré. Le stock a été mis à jour.`,
+        message: [
+          `Arrivage de ${delivery.grossiste} enregistré. Le stock a été mis à jour.`,
+          ...(delivery.avertissements || []),
+        ].join(' '),
       });
       form.reset({
         grossisteId: '',
-        lignes: [{ produitId: '', quantite: 1, prixAchatUnitaire: 0 }],
+        lignes: [
+          {
+            produitId: '',
+            quantite: 1,
+            prixAchatUnitaire: 0,
+            mettreAJourPrixVente: false,
+          },
+        ],
       });
+      setSelectedProducts({});
       setSelectedWholesaler(null);
       setWholesalerSearch('');
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -289,6 +333,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
   const createProduct = useMutation({
     mutationFn: (values: ProductRequest) => api.createProduct(values),
     onSuccess: async (product) => {
+      setSelectedProducts((current) => ({ ...current, [product.id]: product }));
       await queryClient.invalidateQueries({ queryKey: ['products'] });
       await products.refetch();
       queryClient.setQueryData<Page<Product>>(['products', 'delivery'], (page) => {
@@ -321,12 +366,49 @@ export function DeliveriesPage({ role }: { role: Role }) {
   });
   const submit = form.handleSubmit((values) => {
     setFeedback(null);
-    save.mutate(values);
+    save.mutate({
+      grossisteId: values.grossisteId,
+      lignes: values.lignes.map((line) => ({
+        produitId: line.produitId,
+        quantite: line.quantite,
+        prixAchatUnitaire: line.prixAchatUnitaire,
+        ...(admin && line.mettreAJourPrixVente && line.nouveauPrixVente !== undefined
+          ? { nouveauPrixVente: line.nouveauPrixVente }
+          : {}),
+      })),
+    });
   });
+
+  function projectedCost(index: number) {
+    const line = watched[index];
+    const product = line?.produitId ? selectedProducts[line.produitId] : undefined;
+    if (!line || !product) {
+      return null;
+    }
+
+    let stock = product.stockActuel;
+    let cost = product.prixAchatMoyen;
+    for (let previousIndex = 0; previousIndex <= index; previousIndex += 1) {
+      const previous = watched[previousIndex];
+      if (previous?.produitId !== product.id) {
+        continue;
+      }
+      const quantity = Number(previous.quantite) || 0;
+      const purchasePrice = Number(previous.prixAchatUnitaire) || 0;
+      const nextStock = stock + quantity;
+      cost =
+        stock <= 0 || cost == null
+          ? purchasePrice
+          : (stock * cost + quantity * purchasePrice) / nextStock;
+      stock = nextStock;
+    }
+    return cost;
+  }
 
   function selectWholesaler(wholesaler: Grossiste) {
     setSelectedWholesaler(wholesaler);
     setWholesalerSearch(wholesaler.nom);
+    setWholesalerListOpen(false);
     form.setValue('grossisteId', wholesaler.id, { shouldValidate: true });
   }
 
@@ -344,11 +426,12 @@ export function DeliveriesPage({ role }: { role: Role }) {
       const first = wholesalers.data.content[0];
       if (first) {
         selectWholesaler(first);
-      } else if (wholesalers.data.content.length === 0 && wholesalerTerm) {
+      } else if (wholesalers.data.content.length === 0) {
         setWholesalerModal(true);
       }
     }
     if (event.key === 'Escape' && !selectedWholesaler) {
+      setWholesalerListOpen(false);
       setWholesalerSearch('');
       form.setValue('grossisteId', '');
     }
@@ -382,18 +465,27 @@ export function DeliveriesPage({ role }: { role: Role }) {
               <Field
                 aria-autocomplete="list"
                 aria-controls={
-                  wholesalerTerm === wholesalerSearch.trim() && wholesalers.data?.content.length
+                  wholesalerListOpen && wholesalers.data?.content.length
                     ? 'grossiste-options'
                     : undefined
                 }
-                aria-expanded={Boolean(wholesalerSearch.trim()) && !selectedWholesaler}
+                aria-expanded={wholesalerListOpen && !selectedWholesaler}
                 aria-haspopup="listbox"
                 label="Grossiste"
                 name="grossiste-search"
                 value={wholesalerSearch}
+                onFocus={() => {
+                  if (selectedWholesaler) {
+                    setSelectedWholesaler(null);
+                    setWholesalerSearch('');
+                    form.setValue('grossisteId', '');
+                  }
+                  setWholesalerListOpen(true);
+                }}
                 onChange={(event) => {
                   setWholesalerSearch(event.target.value);
                   setSelectedWholesaler(null);
+                  setWholesalerListOpen(true);
                   form.setValue('grossisteId', '');
                 }}
                 onKeyDown={handleWholesalerKeyDown}
@@ -401,7 +493,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
                 autoComplete="off"
                 error={form.formState.errors.grossisteId?.message}
               />
-              {wholesalerSearch.trim() && !selectedWholesaler && (
+              {wholesalerListOpen && !selectedWholesaler && (
                 <>
                   {wholesalerTerm !== wholesalerSearch.trim() || wholesalers.isLoading ? (
                     <p className="supplier-search-status" role="status">
@@ -502,6 +594,9 @@ export function DeliveriesPage({ role }: { role: Role }) {
                       lineNumber={index + 1}
                       value={watched[index]?.produitId || ''}
                       error={form.formState.errors.lignes?.[index]?.produitId?.message}
+                      onProductSelect={(product) => {
+                        setSelectedProducts((current) => ({ ...current, [product.id]: product }));
+                      }}
                       onChange={(productId) =>
                         form.setValue(`lignes.${index}.produitId`, productId, {
                           shouldDirty: true,
@@ -519,14 +614,82 @@ export function DeliveriesPage({ role }: { role: Role }) {
                     />
                     <NumberField
                       control={form.control}
-                      label="Prix d’achat unitaire"
+                      label="Prix d'achat unitaire"
                       name={`lignes.${index}.prixAchatUnitaire`}
                       min={0.01}
                       step={0.01}
                       decimal
+                      required
                       error={form.formState.errors.lignes?.[index]?.prixAchatUnitaire?.message}
                     />
                   </div>
+                  {selectedProducts[watched[index]?.produitId] && (
+                    <div className="delivery-cost-preview" aria-live="polite">
+                      {(() => {
+                        const product = selectedProducts[watched[index].produitId];
+                        const projected = projectedCost(index);
+                        const salePrice = watched[index]?.mettreAJourPrixVente
+                          ? watched[index]?.nouveauPrixVente
+                          : product.prixVente;
+                        const margin =
+                          projected && salePrice
+                            ? ((salePrice - projected) / projected) * 100
+                            : null;
+                        return (
+                          <>
+                            <span>Stock actuel : {product.stockActuel}</span>
+                            {admin && (
+                              <>
+                                <span>
+                                  CMUP actuel :{' '}
+                                  {product.prixAchatMoyen == null
+                                    ? 'Non renseigné'
+                                    : money(product.prixAchatMoyen)}
+                                </span>
+                                <span>Prix de vente : {money(product.prixVente)}</span>
+                                <span>
+                                  CMUP après arrivage :{' '}
+                                  {projected == null ? 'Calcul indisponible' : money(projected)}
+                                </span>
+                                <span>
+                                  Marge prévisionnelle :{' '}
+                                  {margin == null
+                                    ? 'Indisponible'
+                                    : `${percentageFormatter.format(margin)} %`}
+                                </span>
+                                {margin != null && margin < 0 && (
+                                  <strong className="delivery-cost-warning" role="status">
+                                    Avertissement : le prix de vente est inférieur au coût moyen.
+                                  </strong>
+                                )}
+                                <label className="delivery-price-update">
+                                  <input
+                                    type="checkbox"
+                                    {...form.register(`lignes.${index}.mettreAJourPrixVente`)}
+                                  />
+                                  Mettre à jour le prix de vente
+                                </label>
+                                {watched[index]?.mettreAJourPrixVente && (
+                                  <NumberField
+                                    control={form.control}
+                                    decimal
+                                    error={
+                                      form.formState.errors.lignes?.[index]?.nouveauPrixVente
+                                        ?.message
+                                    }
+                                    label="Nouveau prix de vente"
+                                    min={0.01}
+                                    name={`lignes.${index}.nouveauPrixVente`}
+                                    step={0.01}
+                                  />
+                                )}
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
                   {admin && (
                     <button
                       className="text-button add-delivery-product"
@@ -570,10 +733,15 @@ export function DeliveriesPage({ role }: { role: Role }) {
           <Button
             className="primary full"
             type="submit"
-            disabled={save.isPending || products.isLoading}
+            disabled={save.isPending || products.isLoading || !form.formState.isValid}
           >
             {save.isPending ? 'Enregistrement…' : 'Valider l’arrivage'}
           </Button>
+          {incompleteMessage && (
+            <p className="field-error" role="status">
+              {incompleteMessage}
+            </p>
+          )}
           <p className="delivery-summary-note">Le total définitif est calculé par le serveur.</p>
         </aside>
       </form>
@@ -594,10 +762,20 @@ export function DeliveriesPage({ role }: { role: Role }) {
               {...wholesalerForm.register('nom')}
               error={wholesalerForm.formState.errors.nom?.message}
             />
-            <Field
-              label="Téléphone"
-              {...wholesalerForm.register('telephone')}
-              error={wholesalerForm.formState.errors.telephone?.message}
+            <Controller
+              control={wholesalerForm.control}
+              name="telephone"
+              render={({ field, fieldState }) => (
+                <PhoneField
+                  label="Téléphone"
+                  name={field.name}
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  error={fieldState.error?.message}
+                />
+              )}
             />
             <Field
               label="Adresse"
@@ -642,6 +820,16 @@ export function DeliveriesPage({ role }: { role: Role }) {
               step={0.01}
               decimal
               error={productForm.formState.errors.prixVente?.message}
+            />
+            <NumberField
+              control={productForm.control}
+              label="Prix d'achat"
+              name="prixAchat"
+              min={0.01}
+              step={0.01}
+              decimal
+              required
+              error={productForm.formState.errors.prixAchat?.message}
             />
             <NumberField
               control={productForm.control}

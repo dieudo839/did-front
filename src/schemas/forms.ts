@@ -3,6 +3,10 @@ import { z } from 'zod';
 const uuid = z.string().uuid('Identifiant invalide.');
 
 const positiveAmount = z.number().finite().positive('Le montant doit être supérieur à zéro.');
+const requiredPurchasePrice = z
+  .number({ error: "Le prix d'achat est obligatoire et doit être supérieur à 0." })
+  .finite()
+  .positive("Le prix d'achat est obligatoire et doit être supérieur à 0.");
 const positiveQuantity = z
   .number()
   .int('Saisissez un nombre entier.')
@@ -17,14 +21,18 @@ export const productSchema = z.object({
   nom: z.string().trim().min(1, 'Saisissez le nom du produit.').max(150),
   description: z.string().max(500, '500 caractères maximum.'),
   prixVente: positiveAmount,
+  prixAchat: requiredPurchasePrice,
   stockActuel: z.number().int().min(0, 'Le stock ne peut pas être négatif.'),
   seuilAlerte: z.number().int().min(0, 'Le seuil ne peut pas être négatif.'),
 });
+
+export const productUpdateSchema = productSchema.omit({ prixAchat: true });
 
 export const userSchema = z.object({
   nom: z.string().trim().min(1, 'Saisissez le nom.').max(100),
   prenom: z.string().trim().min(1, 'Saisissez le prénom.').max(100),
   matricule: z.string().trim().min(1, 'Saisissez le matricule.').max(50),
+  telephone: z.string().max(30),
   sexe: z.enum(['M', 'F'], { error: 'Choisissez le sexe.' }),
   dateNaissance: z
     .string()
@@ -53,11 +61,18 @@ export const deliverySchema = z.object({
   grossisteId: uuid,
   lignes: z
     .array(
-      z.object({
-        produitId: uuid,
-        quantite: positiveQuantity,
-        prixAchatUnitaire: positiveAmount,
-      }),
+      z
+        .object({
+          produitId: uuid,
+          quantite: positiveQuantity,
+          prixAchatUnitaire: requiredPurchasePrice,
+          mettreAJourPrixVente: z.boolean().optional(),
+          nouveauPrixVente: positiveAmount.optional(),
+        })
+        .refine((line) => !line.mettreAJourPrixVente || line.nouveauPrixVente !== undefined, {
+          path: ['nouveauPrixVente'],
+          message: 'Saisissez le nouveau prix de vente.',
+        }),
     )
     .min(1, 'Ajoutez au moins une ligne.'),
 });
@@ -77,6 +92,7 @@ export const profileSchema = z.object({
   nom: z.string().trim().min(1, 'Saisissez le nom.').max(100),
   prenom: z.string().trim().min(1, 'Saisissez le prénom.').max(100),
   matricule: z.string().trim().min(1, 'Saisissez le matricule.').max(50),
+  telephone: z.string().max(30),
   sexe: z.enum(['M', 'F'], { error: 'Choisissez le sexe.' }),
   dateNaissance: z
     .string()

@@ -1,10 +1,18 @@
 export type Role = 'ADMIN' | 'VENDEUR';
 
-export interface User {
+export interface AuditMetadata {
+  creerPar: string;
+  modifierPar: string;
+  creerDate: string;
+  modifierDate: string;
+}
+
+export interface User extends AuditMetadata {
   id: string;
   nom: string;
   prenom: string;
   matricule: string;
+  telephone: string | null;
   sexe: 'M' | 'F';
   dateNaissance: string;
   identifiant: string;
@@ -18,11 +26,13 @@ export interface Session {
   utilisateur: User;
 }
 
-export interface Product {
+export interface Product extends AuditMetadata {
   id: string;
   nom: string;
   description: string | null;
   prixVente: number;
+  prixAchatMoyen?: number | null;
+  dernierPrixAchat?: number | null;
   stockActuel: number;
   seuilAlerte: number;
 }
@@ -37,7 +47,7 @@ export interface Page<T> {
   };
 }
 
-export interface Client {
+export interface Client extends AuditMetadata {
   id: string;
   nom: string;
   prenom: string | null;
@@ -45,14 +55,14 @@ export interface Client {
   nombreAchats: number;
 }
 
-export interface Grossiste {
+export interface Grossiste extends AuditMetadata {
   id: string;
   nom: string;
   telephone: string | null;
   adresse: string | null;
 }
 
-export interface PurchaseLine {
+export interface PurchaseLine extends AuditMetadata {
   produitId: string;
   produit: string;
   quantite: number;
@@ -60,7 +70,7 @@ export interface PurchaseLine {
   sousTotal: number;
 }
 
-export interface Purchase {
+export interface Purchase extends AuditMetadata {
   id: string;
   dateAchat: string;
   total: number;
@@ -69,24 +79,25 @@ export interface Purchase {
   lignes: PurchaseLine[];
 }
 
-export interface Ticket extends Omit<Purchase, 'id' | 'clientId'> {
+export interface Ticket extends Omit<Purchase, 'id' | 'clientId' | keyof AuditMetadata> {
   achatId: string;
   vendeur: string;
   client: string;
 }
 
-export interface DeliveryLine {
+export interface DeliveryLine extends AuditMetadata {
   produitId: string;
   produit: string;
   quantite: number;
-  prixAchatUnitaire: number;
-  sousTotal: number;
+  prixAchatUnitaire?: number;
+  sousTotal?: number;
+  nouveauPrixVente?: number | null;
 }
 
-export interface Delivery {
+export interface Delivery extends AuditMetadata {
   id: string;
   dateLivraison: string;
-  total: number;
+  total?: number;
   grossisteId: string;
   grossiste: string;
   lignes: DeliveryLine[];
@@ -111,21 +122,34 @@ export interface PurchaseRequest {
 
 export interface DeliveryRequest {
   grossisteId: string;
-  lignes: { produitId: string; quantite: number; prixAchatUnitaire: number }[];
+  lignes: {
+    produitId: string;
+    quantite: number;
+    prixAchatUnitaire: number;
+    nouveauPrixVente?: number;
+  }[];
 }
 
 export interface ProductRequest {
   nom: string;
   description: string;
   prixVente: number;
+  prixAchat: number;
   stockActuel: number;
   seuilAlerte: number;
+}
+
+export type ProductUpdateRequest = Omit<ProductRequest, 'prixAchat'>;
+
+export interface DeliveryResult extends Delivery {
+  avertissements: string[];
 }
 
 export interface UserRequest {
   nom: string;
   prenom: string;
   matricule: string;
+  telephone: string;
   sexe: 'M' | 'F';
   dateNaissance: string;
   identifiant: string;
@@ -138,6 +162,7 @@ export interface ProfileRequest {
   nom: string;
   prenom: string;
   matricule: string;
+  telephone: string;
   sexe: 'M' | 'F';
   dateNaissance: string;
 }
@@ -158,4 +183,26 @@ export interface ApiErrorBody {
   message?: string;
   detail?: string;
   errors?: Record<string, string>;
+}
+
+export interface AuditJournalEntry {
+  id: string;
+  acteur: string;
+  action: string;
+  methode: string;
+  ressource: string;
+  details: string | null;
+  statutHttp: number;
+  adresseIp: string | null;
+  dateAction: string;
+}
+
+export interface AuditPurgeConfiguration {
+  actif: boolean;
+  conservationJours: number;
+}
+
+export interface AuditPurgeResult {
+  nombreSupprime: number;
+  dateAvant: string;
 }

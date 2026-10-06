@@ -53,6 +53,7 @@
   --touch-target: 44px;
   --content-width: 1100px;
   --sidebar-width: 220px;
+  --nav-scrollbar-size: 4px;
   --viewport-min: 320px;
   --width-modal: 520px;
   --width-confirmation-modal: 440px;
@@ -65,6 +66,9 @@
   --width-swatch: 148px;
   --width-control-sample: 360px;
   --width-table-sample: 560px;
+  --height-audit-details: 180px;
+  --empty-state-height: 120px;
+  --icon-size: 20px;
   --width-state-sample: 220px;
   --width-receipt-sample: 300px;
   --attention-rule-width: 3px;

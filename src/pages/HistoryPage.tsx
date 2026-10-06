@@ -13,13 +13,14 @@ import {
   SelectField,
 } from '../components/ui';
 import { Heading, Pager } from '../components/layout';
-import type { Client, Grossiste } from '../types';
+import type { Client, Grossiste, Role } from '../types';
 import { money, localDateTime } from '../utils';
 import { apiErrorMessage } from '../forms';
 
 type Register = 'ventes' | 'arrivages';
 
-export function HistoryPage() {
+export function HistoryPage({ role }: { role: Role }) {
+  const admin = role === 'ADMIN';
   const [register, setRegister] = useState<Register>('ventes');
   const [page, setPage] = useState(0);
   const [dateDebut, setDateDebut] = useState('');
@@ -262,7 +263,7 @@ export function HistoryPage() {
       ) : deliveries.data?.content.length ? (
         <DataTable
           className="operations-table deliveries-table-history"
-          headers={['DATE', 'GROSSISTE', 'ARTICLES', 'TOTAL']}
+          headers={['DATE', 'GROSSISTE', 'ARTICLES', ...(admin ? ['TOTAL'] : [])]}
         >
           {deliveries.data.content.map((delivery) => (
             <tr key={delivery.id}>
@@ -275,12 +276,13 @@ export function HistoryPage() {
                   <summary>{delivery.lignes.length} lignes</summary>
                   {delivery.lignes.map((line, index) => (
                     <p key={`${line.produitId}-${index}`}>
-                      {line.quantite} × {line.produit} <span>{money(line.sousTotal)}</span>
+                      {line.quantite} × {line.produit}
+                      {admin && line.sousTotal != null && <span>{money(line.sousTotal)}</span>}
                     </p>
                   ))}
                 </details>
               </td>
-              <td className="right mono">{money(delivery.total)}</td>
+              {admin && <td className="right mono">{money(delivery.total || 0)}</td>}
             </tr>
           ))}
         </DataTable>

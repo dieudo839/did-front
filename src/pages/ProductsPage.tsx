@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import type { Resolver } from 'react-hook-form';
 import { api } from '../api';
 import {
   ActionFeedback,
@@ -21,14 +22,15 @@ import {
 } from '../components/ui';
 import { Heading, Pager } from '../components/layout';
 import { applyApiFieldErrors, apiErrorMessage } from '../forms';
-import { productSchema, type ProductValues } from '../schemas/forms';
-import type { Product, ProductRequest, Role, TopProduct } from '../types';
+import { productSchema, productUpdateSchema, type ProductValues } from '../schemas/forms';
+import type { Product, ProductRequest, ProductUpdateRequest, Role, TopProduct } from '../types';
 import { money } from '../utils';
 
 const emptyProduct: ProductValues = {
   nom: '',
   description: '',
   prixVente: 0,
+  prixAchat: 0,
   stockActuel: 0,
   seuilAlerte: 5,
 };
@@ -87,12 +89,16 @@ export function ProductsPage({ role }: { role: Role }) {
     enabled: view === 'demandes',
   });
   const form = useForm<ProductValues>({
-    resolver: zodResolver(productSchema),
+    resolver: (editing
+      ? zodResolver(productUpdateSchema)
+      : zodResolver(productSchema)) as Resolver<ProductValues>,
     defaultValues: emptyProduct,
   });
   const save = useMutation({
-    mutationFn: (values: ProductRequest) =>
-      editing ? api.updateProduct(editing.id, values) : api.createProduct(values),
+    mutationFn: (request: ProductRequest | ProductUpdateRequest) =>
+      editing
+        ? api.updateProduct(editing.id, request as ProductUpdateRequest)
+        : api.createProduct(request as ProductRequest),
     onSuccess: () => {
       setEditing(false);
       setFeedback({ tone: 'success', message: 'Produit enregistré. Le rayon est à jour.' });
@@ -127,6 +133,7 @@ export function ProductsPage({ role }: { role: Role }) {
             nom: product.nom,
             description: product.description || '',
             prixVente: product.prixVente,
+            prixAchat: 0,
             stockActuel: product.stockActuel,
             seuilAlerte: product.seuilAlerte,
           }
@@ -135,8 +142,19 @@ export function ProductsPage({ role }: { role: Role }) {
   }
 
   const submit = form.handleSubmit((values) => {
-    const request: ProductRequest = { ...values };
-    save.mutate(request);
+    if (editing) {
+      const request: ProductUpdateRequest = {
+        nom: values.nom,
+        description: values.description,
+        prixVente: values.prixVente,
+        stockActuel: values.stockActuel,
+        seuilAlerte: values.seuilAlerte,
+      };
+      save.mutate(request);
+      return;
+    }
+
+    save.mutate(values);
   });
   const rankedProducts = (topProducts.data || []).filter((item: TopProduct) =>
     item.produit.toLocaleLowerCase('fr-FR').includes(term.toLocaleLowerCase('fr-FR')),
@@ -304,8 +322,16 @@ export function ProductsPage({ role }: { role: Role }) {
         <ErrorState error={products.error} />
       ) : products.data?.content.length ? (
         <DataTable
-          className={admin ? 'products-table products-table-admin' : 'products-table'}
-          headers={['PRODUIT', 'PRIX', 'STOCK', ...(admin ? ['ACTIONS'] : [])]}
+          className={
+            admin ? 'products-table products-table-admin' : 'products-table products-table-vendeur'
+          }
+          headers={[
+            'PRODUIT',
+            'PRIX DE VENTE',
+            ...(admin ? ['CMUP', 'MARGE'] : []),
+            'STOCK',
+            ...(admin ? ['ACTIONS'] : []),
+          ]}
         >
           {products.data.content.map((product) => (
             <tr key={product.id}>
@@ -314,6 +340,21 @@ export function ProductsPage({ role }: { role: Role }) {
                 <small className="table-subline">{product.description}</small>
               </td>
               <td className="right mono">{money(product.prixVente)}</td>
+              {admin && (
+                <>
+                  <td className="right mono">
+                    {product.prixAchatMoyen == null ? '—' : money(product.prixAchatMoyen)}
+                  </td>
+                  <td className="right mono">
+                    {product.prixAchatMoyen == null || product.prixAchatMoyen === 0
+                      ? '—'
+                      : `${(
+                          ((product.prixVente - product.prixAchatMoyen) / product.prixAchatMoyen) *
+                          100
+                        ).toFixed(1)} %`}
+                  </td>
+                </>
+              )}
               <td className="right">
                 <Tag danger={product.stockActuel <= product.seuilAlerte}>
                   {product.stockActuel} en rayon
@@ -383,6 +424,18 @@ export function ProductsPage({ role }: { role: Role }) {
               name="prixVente"
               error={form.formState.errors.prixVente?.message}
             />
+            {!editing && (
+              <NumberField
+                control={form.control}
+                label="Prix d'achat"
+                min={0.01}
+                step={0.01}
+                decimal
+                required
+                name="prixAchat"
+                error={form.formState.errors.prixAchat?.message}
+              />
+            )}
             <NumberField
               control={form.control}
               label="Stock actuel"

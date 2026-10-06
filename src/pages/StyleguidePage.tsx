@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Icon } from '../components/Icon';
 import { ActiviteRecente } from './dashboard/ActiviteRecente';
 import { ClassementProduits } from './dashboard/ClassementProduits';
-import { EnteteDePage } from './dashboard/EnteteDePage';
+import { EnteteDePage, SelecteurPeriode } from './dashboard/EnteteDePage';
 import { GraphiqueCA } from './dashboard/GraphiqueCA';
 import { IndicateurCle } from './dashboard/IndicateurCle';
 import { ListeAlertesStock } from './dashboard/ListeAlertesStock';
@@ -157,14 +157,7 @@ export function StyleguidePage() {
 
       <section className="styleguide-section" aria-labelledby="dashboard-components-heading">
         <h2 id="dashboard-components-heading">Composants du tableau de bord</h2>
-        <EnteteDePage
-          dateLabel=""
-          lastUpdated="—"
-          onPeriodChange={() => undefined}
-          onRefresh={() => undefined}
-          period="7days"
-          refreshing={false}
-        />
+        <EnteteDePage dateLabel="" lastUpdated="—" onRefresh={() => undefined} refreshing={false} />
         <SectionTitre
           description="Ventes et activité sur la période sélectionnée"
           id="styleguide-performance-heading"
@@ -176,6 +169,7 @@ export function StyleguidePage() {
           <IndicateurCle label="Panier moyen" loading value={null} variation={null} />
           <IndicateurCle label="Articles vendus" loading value={null} variation={null} />
         </div>
+        <SelecteurPeriode onChange={() => undefined} period="7days" showDetailedPerformance />
         <div className="dashboard-performance-grid">
           <GraphiqueCA loading periodLabel="7 derniers jours" values={[]} />
           <ClassementProduits loading products={[]} />
@@ -188,7 +182,7 @@ export function StyleguidePage() {
         />
         <div className="dashboard-attention-grid">
           <ListeAlertesStock loading products={[]} />
-          <ActiviteRecente loading activities={[]} />
+          <ActiviteRecente loading activities={[]} audience="team" />
         </div>
       </section>
 

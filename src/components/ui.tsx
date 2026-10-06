@@ -89,6 +89,7 @@ interface NumberFieldProps<T extends FieldValues> {
   max?: number;
   step?: number;
   decimal?: boolean;
+  required?: boolean;
 }
 
 function formatNumberInput(value: string, decimal: boolean) {
@@ -110,6 +111,7 @@ export function NumberField<T extends FieldValues>({
   max,
   step = 1,
   decimal = false,
+  required = false,
 }: NumberFieldProps<T>) {
   const { field } = useController({ control, name });
   const [display, setDisplay] = useState(() =>
@@ -144,7 +146,10 @@ export function NumberField<T extends FieldValues>({
   return (
     <div className="field-wrap">
       <label className="field" htmlFor={fieldId}>
-        <span>{label}</span>
+        <span>
+          {label}
+          {required && <span aria-hidden="true"> *</span>}
+        </span>
         <input
           id={fieldId}
           name={field.name}
@@ -156,6 +161,7 @@ export function NumberField<T extends FieldValues>({
           min={min}
           max={max}
           step={step}
+          required={required}
           onBlur={field.onBlur}
           onChange={(event) => updateValue(event.target.value)}
           aria-invalid={Boolean(error)}
@@ -342,8 +348,39 @@ export function LoadingState({ label = 'Chargement en cours…' }: { label?: str
   );
 }
 
-export function EmptyState({ children }: { children: ReactNode }) {
-  return <p className="empty">{children}</p>;
+export function EmptyState({
+  children,
+  title,
+  description,
+  action,
+  compact = false,
+}: {
+  children?: ReactNode;
+  title?: string;
+  description?: string;
+  action?: ReactNode;
+  compact?: boolean;
+}) {
+  return (
+    <section
+      className={`empty-state${compact ? ' empty-state-compact' : ''}`}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="empty-state-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 5.5h16v13H4z" />
+          <path d="M4 13h4l1.5 2h5l1.5-2h4" />
+        </svg>
+      </span>
+      <div className="empty-state-content">
+        {title && <h2>{title}</h2>}
+        {children && <p>{children}</p>}
+        {description && <p className="empty-state-description">{description}</p>}
+        {action}
+      </div>
+    </section>
+  );
 }
 
 export function ErrorState({ error }: { error: unknown }) {

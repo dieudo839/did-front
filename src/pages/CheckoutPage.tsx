@@ -5,11 +5,12 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { useFieldArray, useForm, useWatch } from 'react-hook-form';
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Heading, Pager } from '../components/layout';
+import { PhoneField } from '../components/PhoneField';
 import { Receipt } from '../components/Receipt';
 import {
   ActionFeedback,
@@ -192,6 +193,16 @@ export function CheckoutPage() {
     }
   }
 
+  async function printTicket() {
+    if (!ticket) return;
+    try {
+      await api.recordTicketPrint(ticket.achatId);
+    } catch (error) {
+      setFeedback({ tone: 'error', message: apiErrorMessage(error) });
+    }
+    window.print();
+  }
+
   return (
     <>
       <Heading
@@ -209,7 +220,7 @@ export function CheckoutPage() {
             <p>
               Vente du {localDateTime(ticket.dateAchat)} · {money(ticket.total)}
             </p>
-            <Button className="primary" onClick={() => window.print()}>
+            <Button className="primary" onClick={printTicket}>
               Imprimer le ticket
             </Button>
             <Button onClick={downloadTicket}>Télécharger le PDF</Button>
@@ -263,7 +274,7 @@ export function CheckoutPage() {
                 ))}
               </div>
             ) : (
-              <EmptyState>Aucun produit trouvé dans le rayon.</EmptyState>
+              <EmptyState compact>Aucun produit trouvé dans le rayon.</EmptyState>
             )}
             {productsQuery.data && (
               <div className="checkout-product-pagination">
@@ -409,7 +420,7 @@ export function CheckoutPage() {
               )}
             </div>
             {lines.fields.length === 0 ? (
-              <EmptyState>Ajoutez un produit depuis le rayon.</EmptyState>
+              <EmptyState compact>Ajoutez un produit depuis le rayon.</EmptyState>
             ) : (
               <div className="basket-lines">
                 {lines.fields.map((line, index) => {
@@ -486,10 +497,20 @@ export function CheckoutPage() {
               {...clientCreate.register('prenom')}
               error={clientCreate.formState.errors.prenom?.message}
             />
-            <Field
-              label="Téléphone"
-              {...clientCreate.register('telephone')}
-              error={clientCreate.formState.errors.telephone?.message}
+            <Controller
+              control={clientCreate.control}
+              name="telephone"
+              render={({ field, fieldState }) => (
+                <PhoneField
+                  label="Téléphone"
+                  name={field.name}
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  error={fieldState.error?.message}
+                />
+              )}
             />
             <Button className="primary" type="submit" disabled={createClient.isPending}>
               Créer le client

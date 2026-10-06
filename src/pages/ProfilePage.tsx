@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../api';
 import { ActionFeedback, Button, Field, SelectField } from '../components/ui';
+import { PhoneField } from '../components/PhoneField';
 import { Heading } from '../components/layout';
 import { Icon } from '../components/Icon';
 import { apiErrorMessage, applyApiFieldErrors } from '../forms';
@@ -33,6 +34,7 @@ export function ProfilePage({
       nom: user.nom,
       prenom: user.prenom,
       matricule: user.matricule,
+      telephone: user.telephone || '',
       sexe: user.sexe,
       dateNaissance: user.dateNaissance,
     },
@@ -89,6 +91,10 @@ export function ProfilePage({
               <dt>Matricule</dt>
               <dd>{user.matricule}</dd>
             </div>
+            <div>
+              <dt>Téléphone</dt>
+              <dd>{user.telephone || 'Non renseigné'}</dd>
+            </div>
           </dl>
         </section>
 
@@ -120,6 +126,21 @@ export function ProfilePage({
                 label="Matricule"
                 {...profileForm.register('matricule')}
                 error={profileForm.formState.errors.matricule?.message}
+              />
+              <Controller
+                control={profileForm.control}
+                name="telephone"
+                render={({ field, fieldState }) => (
+                  <PhoneField
+                    label="Téléphone"
+                    name={field.name}
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    error={fieldState.error?.message}
+                  />
+                )}
               />
               <SelectField
                 label="Sexe"

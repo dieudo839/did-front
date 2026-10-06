@@ -2,14 +2,19 @@ import { request, requestBlob } from './client';
 import type {
   Client,
   ClientRequest,
+  AuditJournalEntry,
+  AuditPurgeConfiguration,
+  AuditPurgeResult,
   Delivery,
   DeliveryRequest,
+  DeliveryResult,
   Grossiste,
   GrossisteRequest,
   Page,
   ProfileRequest,
   Product,
   ProductRequest,
+  ProductUpdateRequest,
   Purchase,
   PurchaseRequest,
   Revenue,
@@ -48,11 +53,27 @@ function pageParams(
 }
 
 export const api = {
+  auditJournal: (page: number, filters: Record<string, string | undefined>) =>
+    request<Page<AuditJournalEntry>>(
+      `/api/journaux?${pageParams(page, 20, 'dateAction,desc', filters)}`,
+    ),
+  auditPurgeConfiguration: () =>
+    request<AuditPurgeConfiguration>('/api/journaux/configuration-purge'),
+  updateAuditPurgeConfiguration: (configuration: AuditPurgeConfiguration) =>
+    request<AuditPurgeConfiguration>('/api/journaux/configuration-purge', {
+      method: 'PUT',
+      body: JSON.stringify(configuration),
+    }),
+  purgeAudit: (dateAvant: string) =>
+    request<AuditPurgeResult>(`/api/journaux/purge?dateAvant=${dateAvant}`, { method: 'DELETE' }),
+  recordTicketPrint: (id: string) =>
+    request<void>(`/api/achats/${id}/ticket/impression`, { method: 'POST' }),
   login: (identifiant: string, motDePasse: string) =>
     request<Session>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ identifiant, motDePasse }),
     }),
+  logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   products: (page = 0, nom = '', size = 20, stockBas = false, filters: ProductFilters = {}) =>
     request<Page<Product>>(
       `/api/produits?${pageParams(page, size, filters.sort || 'nom,asc', {
@@ -66,7 +87,7 @@ export const api = {
     ),
   createProduct: (body: ProductRequest) =>
     request<Product>('/api/produits', { method: 'POST', body: JSON.stringify(body) }),
-  updateProduct: (id: string, body: ProductRequest) =>
+  updateProduct: (id: string, body: ProductUpdateRequest) =>
     request<Product>(`/api/produits/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteProduct: (id: string) => request<void>(`/api/produits/${id}`, { method: 'DELETE' }),
   createPurchase: (body: PurchaseRequest) =>
@@ -76,7 +97,7 @@ export const api = {
   ticket: (id: string) => request<Ticket>(`/api/achats/${id}/ticket`),
   ticketPdf: (id: string) => requestBlob(`/api/achats/${id}/ticket/pdf`),
   createDelivery: (body: DeliveryRequest) =>
-    request<Delivery>('/api/livraisons', { method: 'POST', body: JSON.stringify(body) }),
+    request<DeliveryResult>('/api/livraisons', { method: 'POST', body: JSON.stringify(body) }),
   deliveries: (
     page: number,
     filters: Record<string, string | undefined>,
@@ -97,8 +118,8 @@ export const api = {
     request<Page<Grossiste>>(`/api/grossistes?${pageParams(page, size, 'nom,asc', { nom })}`),
   createWholesaler: (body: GrossisteRequest) =>
     request<Grossiste>('/api/grossistes', { method: 'POST', body: JSON.stringify(body) }),
-  users: (page: number) =>
-    request<Page<User>>(`/api/utilisateurs?${pageParams(page, 10, 'nom,asc')}`),
+  users: (page: number, filters: Record<string, string | undefined> = {}) =>
+    request<Page<User>>(`/api/utilisateurs?${pageParams(page, 10, 'nom,asc', filters)}`),
   createUser: (body: UserRequest) =>
     request<User>('/api/utilisateurs', { method: 'POST', body: JSON.stringify(body) }),
   updateUser: (id: string, body: UserRequest) =>

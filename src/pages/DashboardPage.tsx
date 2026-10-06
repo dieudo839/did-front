@@ -5,7 +5,7 @@ import { ApiError, readSession } from '../api/client';
 import { ActiviteRecente } from './dashboard/ActiviteRecente';
 import { ClassementProduits } from './dashboard/ClassementProduits';
 import { ComptesInactifs } from './dashboard/ComptesInactifs';
-import { EnteteDePage } from './dashboard/EnteteDePage';
+import { EnteteDePage, SelecteurPeriode } from './dashboard/EnteteDePage';
 import { GraphiqueCA, rangeDescription } from './dashboard/GraphiqueCA';
 import { IndicateurCle } from './dashboard/IndicateurCle';
 import { ListeAlertesStock } from './dashboard/ListeAlertesStock';
@@ -173,12 +173,10 @@ export function DashboardPage() {
   const recentPurchases = useQuery({
     queryKey: ['dashboard', 'recent-purchases'],
     queryFn: () => api.purchases(0, {}),
-    enabled: isAdmin,
   });
   const recentDeliveries = useQuery({
     queryKey: ['dashboard', 'recent-deliveries'],
     queryFn: () => api.deliveries(0, {}),
-    enabled: isAdmin,
   });
   const inactive = useQuery({
     queryKey: ['dashboard', 'inactive-users'],
@@ -269,9 +267,7 @@ export function DashboardPage() {
       <EnteteDePage
         dateLabel={longDate(new Date())}
         lastUpdated={latestTimestamp}
-        onPeriodChange={setPeriod}
         onRefresh={refreshDashboard}
-        period={period}
         refreshing={refreshing}
       />
 
@@ -282,6 +278,8 @@ export function DashboardPage() {
           id="performance-title"
           title="Performance"
         />
+
+        <SelecteurPeriode onChange={setPeriod} period={period} showDetailedPerformance={isAdmin} />
 
         <div className="dashboard-indicators" aria-label="Indicateurs de performance">
           <IndicateurCle
@@ -383,18 +381,17 @@ export function DashboardPage() {
             onRetry={() => stock.refetch()}
             products={stockAlerts}
           />
-          {isAdmin && (
-            <ActiviteRecente
-              activities={activities}
-              error={activityError}
-              loading={recentPurchases.isLoading && recentDeliveries.isLoading}
-              onRetry={() => {
-                recentPurchases.refetch();
-                recentDeliveries.refetch();
-              }}
-              partialError={activityError ? undefined : activityPartialError}
-            />
-          )}
+          <ActiviteRecente
+            activities={activities}
+            audience={isAdmin ? 'team' : 'personal'}
+            error={activityError}
+            loading={recentPurchases.isLoading && recentDeliveries.isLoading}
+            onRetry={() => {
+              recentPurchases.refetch();
+              recentDeliveries.refetch();
+            }}
+            partialError={activityError ? undefined : activityPartialError}
+          />
         </div>
         {isAdmin && (
           <ComptesInactifs

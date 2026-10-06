@@ -24,7 +24,8 @@ export interface DashboardActivity {
   id: string;
   type: 'purchase' | 'delivery';
   label: string;
-  total: number;
+  creerPar: string;
+  total: number | null;
   date: string;
 }
 
@@ -67,6 +68,7 @@ export function toActivity(purchases: Purchase[], deliveries: Delivery[]): Dashb
     id: `purchase-${purchase.id}`,
     type: 'purchase' as const,
     label: `Achat · ${purchase.client || 'Client comptoir'}`,
+    creerPar: purchase.creerPar,
     total: purchase.total,
     date: purchase.dateAchat,
   }));
@@ -74,7 +76,8 @@ export function toActivity(purchases: Purchase[], deliveries: Delivery[]): Dashb
     id: `delivery-${delivery.id}`,
     type: 'delivery' as const,
     label: `Livraison · ${delivery.grossiste}`,
-    total: delivery.total,
+    creerPar: delivery.creerPar,
+    total: delivery.total ?? null,
     date: delivery.dateLivraison,
   }));
   return [...purchaseActivity, ...deliveryActivity]

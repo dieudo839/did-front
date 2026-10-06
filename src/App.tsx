@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { SESSION_KEY, readSession } from './api/client';
+import { api } from './api';
 import { GlobalLoader } from './components/GlobalLoader';
 import { Shell } from './components/layout';
 import { CheckoutPage } from './pages/CheckoutPage';
+import { AuditJournalPage } from './pages/AuditJournalPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DeliveriesPage } from './pages/DeliveriesPage';
@@ -28,11 +30,17 @@ function App() {
     navigate('/');
   }
 
-  function logout() {
-    localStorage.removeItem(SESSION_KEY);
-    setSession(null);
-    queryClient.clear();
-    navigate('/login');
+  async function logout() {
+    try {
+      await api.logout();
+    } catch {
+      // Clear the local session even if the server cannot record the logout.
+    } finally {
+      localStorage.removeItem(SESSION_KEY);
+      setSession(null);
+      queryClient.clear();
+      navigate('/login');
+    }
   }
 
   function updateUser(updatedUser: User) {
@@ -72,7 +80,7 @@ function App() {
                     path="/arrivages"
                     element={<DeliveriesPage role={session.utilisateur.role} />}
                   />
-                  <Route path="/ventes" element={<HistoryPage />} />
+                  <Route path="/ventes" element={<HistoryPage role={session.utilisateur.role} />} />
                   <Route
                     path="/profil"
                     element={<ProfilePage user={session.utilisateur} onUserUpdated={updateUser} />}
@@ -82,6 +90,16 @@ function App() {
                     element={
                       session.utilisateur.role === 'ADMIN' ? (
                         <UsersPage />
+                      ) : (
+                        <Navigate to="/" replace />
+                      )
+                    }
+                  />
+                  <Route
+                    path="/journaux"
+                    element={
+                      session.utilisateur.role === 'ADMIN' ? (
+                        <AuditJournalPage />
                       ) : (
                         <Navigate to="/" replace />
                       )
