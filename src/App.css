@@ -1426,10 +1426,11 @@ tbody tr:hover {
 }
 
 .supplier-options,
-.supplier-no-results {
+.supplier-no-results,
+.delivery-product-options {
   position: absolute;
   z-index: 4;
-  top: calc(100% - var(--space-4));
+  top: calc(100% + var(--space-1));
   right: var(--space-0);
   left: var(--space-0);
   max-height: var(--dropdown-max-height);
@@ -1445,6 +1446,15 @@ tbody tr:hover {
 }
 
 .supplier-options .suggestion:last-child {
+  border-bottom: 0;
+}
+
+.delivery-product-options .suggestion {
+  border: 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.delivery-product-options .suggestion:last-child {
   border-bottom: 0;
 }
 
@@ -1823,25 +1833,7 @@ tbody tr:hover {
 }
 
 .delivery-product-options {
-  position: absolute;
   z-index: 5;
-  top: calc(100% - var(--space-4));
-  right: var(--space-0);
-  left: var(--space-0);
-  max-height: var(--dropdown-max-height);
-  overflow-y: auto;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-}
-
-.delivery-product-options .suggestion {
-  border: 0;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-
-.delivery-product-options .suggestion:last-child {
-  border-bottom: 0;
 }
 
 .delivery-product-status {

@@ -76,7 +76,7 @@ export const api = {
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   products: (page = 0, nom = '', size = 20, stockBas = false, filters: ProductFilters = {}) =>
     request<Page<Product>>(
-      `/api/produits?${pageParams(page, size, filters.sort || 'nom,asc', {
+      `/api/produits?${pageParams(page, size, filters.sort || 'creerDate,desc', {
         nom: nom || undefined,
         stockBas: stockBas ? 'true' : undefined,
         stockMinimum: filters.stockMinimum,

@@ -461,7 +461,14 @@ export function DeliveriesPage({ role }: { role: Role }) {
                 <p>Choisissez le fournisseur de cet arrivage.</p>
               </div>
             </div>
-            <div className="supplier-picker">
+            <div
+              className="supplier-picker"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setWholesalerListOpen(false);
+                }
+              }}
+            >
               <Field
                 aria-autocomplete="list"
                 aria-controls={

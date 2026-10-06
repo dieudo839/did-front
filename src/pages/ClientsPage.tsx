@@ -87,7 +87,7 @@ export function ClientsPage() {
           label={tab === 'clients' ? 'Rechercher un client' : 'Rechercher un grossiste'}
           name="contacts-search"
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Saisir un nom"
+          placeholder={tab === 'clients' ? 'Nom, prénom ou téléphone' : 'Nom ou téléphone'}
           value={search}
         />
         {tab === 'clients' ? (

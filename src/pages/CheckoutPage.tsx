@@ -309,7 +309,14 @@ export function CheckoutPage() {
               ARTICLES
             </p>
             <h2>À régler</h2>
-            <div className="customer-picker">
+            <div
+              className="customer-picker"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setClientPickerOpen(false);
+                }
+              }}
+            >
               <div className="customer-picker-control">
                 <Field
                   aria-autocomplete="list"
@@ -327,7 +334,7 @@ export function CheckoutPage() {
                   }}
                   onFocus={() => setClientPickerOpen(true)}
                   onKeyDown={handleClientKeyDown}
-                  placeholder="Chercher un client par nom"
+                  placeholder="Nom, prénom ou téléphone"
                   autoComplete="off"
                 />
                 {!selectedClient && (

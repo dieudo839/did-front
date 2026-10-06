@@ -45,7 +45,7 @@ export function ProductsPage({ role }: { role: Role }) {
   const [minimumPriceFilter, setMinimumPriceFilter] = useState('');
   const [maximumPriceFilter, setMaximumPriceFilter] = useState('');
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all');
-  const [sort, setSort] = useState('nom,asc');
+  const [sort, setSort] = useState('creerDate,desc');
   const [page, setPage] = useState(0);
   const [demandPage, setDemandPage] = useState(0);
   const [view, setView] = useState<'catalogue' | 'demandes'>('catalogue');
@@ -274,6 +274,8 @@ export function ProductsPage({ role }: { role: Role }) {
             }}
             value={sort}
           >
+            <option value="creerDate,desc">Les plus récents</option>
+            <option value="creerDate,asc">Les plus anciens</option>
             <option value="nom,asc">Nom A à Z</option>
             <option value="prixVente,asc">Prix croissant</option>
             <option value="prixVente,desc">Prix décroissant</option>
