@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, type Resolver } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { readSession } from '../api/client';
@@ -22,7 +22,7 @@ import {
   Tag,
 } from '../components/ui';
 import { apiErrorMessage, applyApiFieldErrors } from '../forms';
-import { userSchema, type UserValues } from '../schemas/forms';
+import { userSchema, userUpdateSchema, type UserValues } from '../schemas/forms';
 import type { User } from '../types';
 
 const blankUser: UserValues = {
@@ -68,10 +68,21 @@ export function UsersPage() {
       }),
   });
   const filtresActifs = Boolean(recherche || role || actif);
-  const form = useForm<UserValues>({ resolver: zodResolver(userSchema), defaultValues: blankUser });
+  const form = useForm<UserValues>({
+    resolver: (editing
+      ? zodResolver(userUpdateSchema)
+      : zodResolver(userSchema)) as Resolver<UserValues>,
+    defaultValues: blankUser,
+  });
   const save = useMutation({
-    mutationFn: (body: UserValues) =>
-      editing ? api.updateUser(editing.id, body) : api.createUser(body),
+    mutationFn: (body: UserValues) => {
+      if (!editing) {
+        return api.createUser(body);
+      }
+
+      const { motDePasse, ...user } = body;
+      return api.updateUser(editing.id, motDePasse?.trim() ? body : user);
+    },
     onSuccess: (user) => {
       setUserToChangeStatus(null);
       setFeedback({ tone: 'success', message: `Compte ${user.identifiant} enregistré.` });
@@ -305,16 +316,19 @@ export function UsersPage() {
           >
             <Field
               label="Nom"
+              required
               {...form.register('nom')}
               error={form.formState.errors.nom?.message}
             />
             <Field
               label="Prénom"
+              required
               {...form.register('prenom')}
               error={form.formState.errors.prenom?.message}
             />
             <Field
               label="Matricule"
+              required
               {...form.register('matricule')}
               error={form.formState.errors.matricule?.message}
             />
@@ -335,6 +349,7 @@ export function UsersPage() {
             />
             <SelectField
               label="Sexe"
+              required
               {...form.register('sexe')}
               error={form.formState.errors.sexe?.message}
             >
@@ -343,18 +358,22 @@ export function UsersPage() {
             </SelectField>
             <Field
               label="Date de naissance"
+              required
               type="date"
               {...form.register('dateNaissance')}
               error={form.formState.errors.dateNaissance?.message}
             />
             <Field
               label="Nom d’utilisateur"
+              required
               {...form.register('identifiant')}
               error={form.formState.errors.identifiant?.message}
             />
             <div className="user-password-control">
               <Field
-                label={editing ? 'Nouveau mot de passe (requis par l’API)' : 'Mot de passe'}
+                label="Mot de passe"
+                required={!editing}
+                help={editing ? 'Laissez vide pour conserver le mot de passe actuel.' : undefined}
                 type={passwordVisible ? 'text' : 'password'}
                 autoComplete="new-password"
                 {...form.register('motDePasse')}
@@ -375,6 +394,7 @@ export function UsersPage() {
             </div>
             <SelectField
               label="Rôle"
+              required
               {...form.register('role')}
               error={form.formState.errors.role?.message}
             >

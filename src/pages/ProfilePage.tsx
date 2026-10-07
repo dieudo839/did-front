@@ -114,16 +114,19 @@ export function ProfilePage({
             >
               <Field
                 label="Prénom"
+                required
                 {...profileForm.register('prenom')}
                 error={profileForm.formState.errors.prenom?.message}
               />
               <Field
                 label="Nom"
+                required
                 {...profileForm.register('nom')}
                 error={profileForm.formState.errors.nom?.message}
               />
               <Field
                 label="Matricule"
+                required
                 {...profileForm.register('matricule')}
                 error={profileForm.formState.errors.matricule?.message}
               />
@@ -144,6 +147,7 @@ export function ProfilePage({
               />
               <SelectField
                 label="Sexe"
+                required
                 {...profileForm.register('sexe')}
                 error={profileForm.formState.errors.sexe?.message}
               >
@@ -152,6 +156,7 @@ export function ProfilePage({
               </SelectField>
               <Field
                 label="Date de naissance"
+                required
                 type="date"
                 {...profileForm.register('dateNaissance')}
                 error={profileForm.formState.errors.dateNaissance?.message}
@@ -188,6 +193,7 @@ export function ProfilePage({
             >
               <Field
                 label="Ancien mot de passe"
+                required
                 type={passwordVisible ? 'text' : 'password'}
                 autoComplete="current-password"
                 {...passwordForm.register('ancienMotDePasse')}
@@ -195,6 +201,7 @@ export function ProfilePage({
               />
               <Field
                 label="Nouveau mot de passe"
+                required
                 type={passwordVisible ? 'text' : 'password'}
                 autoComplete="new-password"
                 {...passwordForm.register('nouveauMotDePasse')}
@@ -202,6 +209,7 @@ export function ProfilePage({
               />
               <Field
                 label="Confirmer le nouveau mot de passe"
+                required
                 type={passwordVisible ? 'text' : 'password'}
                 autoComplete="new-password"
                 {...passwordForm.register('confirmation')}

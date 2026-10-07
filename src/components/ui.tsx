@@ -19,6 +19,15 @@ export function Button({ className = '', ...props }: ButtonHTMLAttributes<HTMLBu
   return <button {...props} className={`button ${className}`.trim()} />;
 }
 
+export function RequiredMark() {
+  return (
+    <span className="field-required">
+      <span aria-hidden="true">*</span>
+      <span className="visually-hidden">Champ obligatoire</span>
+    </span>
+  );
+}
+
 export function IconButton({
   label,
   icon,
@@ -45,7 +54,7 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
-  { label, error, help, id, ...props },
+  { label, error, help, id, required = false, ...props },
   ref,
 ) {
   const generatedId = useId();
@@ -57,11 +66,16 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
   return (
     <div className="field-wrap">
       <label className="field" htmlFor={fieldId}>
-        <span>{label}</span>
+        <span className="field-label-row">
+          <span>{label}</span>
+          {required && <RequiredMark />}
+        </span>
         <input
           {...props}
           ref={ref}
           id={fieldId}
+          required={required}
+          aria-required={required || undefined}
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy || undefined}
         />
@@ -146,9 +160,9 @@ export function NumberField<T extends FieldValues>({
   return (
     <div className="field-wrap">
       <label className="field" htmlFor={fieldId}>
-        <span>
-          {label}
-          {required && <span aria-hidden="true"> *</span>}
+        <span className="field-label-row">
+          <span>{label}</span>
+          {required && <RequiredMark />}
         </span>
         <input
           id={fieldId}
@@ -162,6 +176,7 @@ export function NumberField<T extends FieldValues>({
           max={max}
           step={step}
           required={required}
+          aria-required={required || undefined}
           onBlur={field.onBlur}
           onChange={(event) => updateValue(event.target.value)}
           aria-invalid={Boolean(error)}
@@ -222,7 +237,7 @@ interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(function SelectField(
-  { label, error, help, id, children, ...props },
+  { label, error, help, id, children, required = false, ...props },
   ref,
 ) {
   const generatedId = useId();
@@ -234,11 +249,16 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
   return (
     <div className="field-wrap">
       <label className="field" htmlFor={fieldId}>
-        <span>{label}</span>
+        <span className="field-label-row">
+          <span>{label}</span>
+          {required && <RequiredMark />}
+        </span>
         <select
           {...props}
           ref={ref}
           id={fieldId}
+          required={required}
+          aria-required={required || undefined}
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy || undefined}
         >
@@ -598,23 +618,35 @@ export function ActionFeedback({
     return () => window.clearTimeout(timer);
   }, [message, tone]);
 
-  return (
-    <Modal
-      className={`action-feedback-modal feedback-${tone}`}
-      title={tone === 'success' ? 'Action réussie' : 'Action impossible'}
-      onClose={onClose}
-    >
-      <div className="action-feedback-content" role={tone === 'error' ? 'alert' : 'status'}>
+  if (tone === 'success') {
+    return (
+      <div className="action-feedback-toast" role="status" aria-live="polite">
         <span className="action-feedback-symbol" aria-hidden="true">
-          <Icon name={tone === 'success' ? 'success' : 'warning'} />
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="m5 12 4.5 4.5L19 7" />
+          </svg>
         </span>
         <p>{message}</p>
       </div>
-      {tone === 'success' && (
-        <p className="action-feedback-note">Cette fenêtre se fermera automatiquement.</p>
-      )}
+    );
+  }
+
+  return (
+    <Modal
+      className="action-feedback-modal feedback-error"
+      title="Action impossible"
+      onClose={onClose}
+    >
+      <div className="action-feedback-content" role="alert">
+        <span className="action-feedback-symbol" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="m7 7 10 10M17 7 7 17" />
+          </svg>
+        </span>
+        <p>{message}</p>
+      </div>
       <div className="confirmation-actions">
-        <Button className={tone === 'success' ? 'primary' : ''} type="button" onClick={onClose}>
+        <Button type="button" onClick={onClose}>
           Fermer
         </Button>
       </div>

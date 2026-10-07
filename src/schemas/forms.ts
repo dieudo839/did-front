@@ -24,6 +24,7 @@ export const productSchema = z.object({
   prixAchat: requiredPurchasePrice,
   stockActuel: z.number().int().min(0, 'Le stock ne peut pas être négatif.'),
   seuilAlerte: z.number().int().min(0, 'Le seuil ne peut pas être négatif.'),
+  categorieId: uuid,
 });
 
 export const productUpdateSchema = productSchema.omit({ prixAchat: true });
@@ -43,6 +44,16 @@ export const userSchema = z.object({
   motDePasse: z.string().min(8, '8 caractères minimum.'),
   role: z.enum(['ADMIN', 'VENDEUR']),
   actif: z.boolean(),
+});
+
+export const userUpdateSchema = userSchema.extend({
+  motDePasse: z
+    .string()
+    .optional()
+    .refine(
+      (value) => value === undefined || value.trim().length === 0 || value.length >= 8,
+      '8 caractères minimum.',
+    ),
 });
 
 export const purchaseSchema = z.object({
@@ -113,10 +124,20 @@ export const wholesalerSchema = z.object({
   adresse: z.string().max(255),
 });
 
+export const categorySchema = z.object({
+  libelle: z
+    .string()
+    .trim()
+    .min(2, 'Le libellé doit contenir au moins 2 caractères.')
+    .max(100, '100 caractères maximum.'),
+});
+
 export type LoginValues = z.infer<typeof loginSchema>;
 export type ProductValues = z.infer<typeof productSchema>;
 export type UserValues = z.infer<typeof userSchema>;
+export type UserUpdateValues = z.infer<typeof userUpdateSchema>;
 export type PurchaseValues = z.infer<typeof purchaseSchema>;
 export type DeliveryValues = z.infer<typeof deliverySchema>;
 export type PasswordValues = z.infer<typeof passwordSchema>;
 export type ProfileValues = z.infer<typeof profileSchema>;
+export type CategoryValues = z.infer<typeof categorySchema>;

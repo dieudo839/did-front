@@ -66,6 +66,13 @@ export function Shell({
           {session.utilisateur.role === 'ADMIN' && (
             <>
               <Link
+                to="/categories"
+                className={location.pathname === '/categories' ? 'active' : ''}
+                onClick={closeMenu}
+              >
+                Catégories
+              </Link>
+              <Link
                 to="/utilisateurs"
                 className={location.pathname === '/utilisateurs' ? 'active' : ''}
                 onClick={closeMenu}

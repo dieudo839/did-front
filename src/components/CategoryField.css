@@ -1,0 +1,47 @@
+.category-field {
+  position: relative;
+}
+
+.category-options {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  left: 0;
+  max-height: var(--dropdown-max-height);
+  overflow-y: auto;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.category-options button,
+.category-option-message {
+  display: flex;
+  width: 100%;
+  min-height: var(--touch-target);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.category-options button:hover,
+.category-options button[aria-selected='true'] {
+  background: var(--color-accent-soft);
+}
+
+.category-options small,
+.category-option-message {
+  color: var(--color-secondary);
+  font-size: var(--text-xs);
+}
+
+.category-options .category-create-option {
+  color: var(--color-accent);
+  font-weight: var(--weight-semibold);
+}

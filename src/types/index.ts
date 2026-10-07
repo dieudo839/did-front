@@ -35,6 +35,18 @@ export interface Product extends AuditMetadata {
   dernierPrixAchat?: number | null;
   stockActuel: number;
   seuilAlerte: number;
+  categorieId: string;
+  categorieLibelle: string;
+}
+
+export interface Category extends AuditMetadata {
+  id: string;
+  libelle: string;
+  nombreProduits: number;
+}
+
+export interface CategoryRequest {
+  libelle: string;
 }
 
 export interface Page<T> {
@@ -137,6 +149,7 @@ export interface ProductRequest {
   prixAchat: number;
   stockActuel: number;
   seuilAlerte: number;
+  categorieId: string;
 }
 
 export type ProductUpdateRequest = Omit<ProductRequest, 'prixAchat'>;
@@ -157,6 +170,10 @@ export interface UserRequest {
   role: Role;
   actif: boolean;
 }
+
+export type UserUpdateRequest = Omit<UserRequest, 'motDePasse'> & {
+  motDePasse?: string;
+};
 
 export interface ProfileRequest {
   nom: string;

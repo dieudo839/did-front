@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import type { Resolver } from 'react-hook-form';
 import { api } from '../api';
+import { CategoryField } from '../components/CategoryField';
 import {
   ActionFeedback,
   Button,
@@ -33,6 +34,7 @@ const emptyProduct: ProductValues = {
   prixAchat: 0,
   stockActuel: 0,
   seuilAlerte: 5,
+  categorieId: '',
 };
 
 export function ProductsPage({ role }: { role: Role }) {
@@ -45,6 +47,7 @@ export function ProductsPage({ role }: { role: Role }) {
   const [minimumPriceFilter, setMinimumPriceFilter] = useState('');
   const [maximumPriceFilter, setMaximumPriceFilter] = useState('');
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [sort, setSort] = useState('creerDate,desc');
   const [page, setPage] = useState(0);
   const [demandPage, setDemandPage] = useState(0);
@@ -74,14 +77,28 @@ export function ProductsPage({ role }: { role: Role }) {
   }, [minimumPrice, maximumPrice]);
 
   const products = useQuery({
-    queryKey: ['products', page, term, minimumPriceFilter, maximumPriceFilter, stockFilter, sort],
+    queryKey: [
+      'products',
+      page,
+      term,
+      minimumPriceFilter,
+      maximumPriceFilter,
+      stockFilter,
+      categoryFilter,
+      sort,
+    ],
     queryFn: () =>
       api.products(page, term, 10, stockFilter === 'low', {
         stockMaximum: stockFilter === 'out' ? '0' : undefined,
         prixMinimum: minimumPriceFilter || undefined,
         prixMaximum: maximumPriceFilter || undefined,
+        categorieId: categoryFilter || undefined,
         sort,
       }),
+  });
+  const categories = useQuery({
+    queryKey: ['categories', 'all'],
+    queryFn: () => api.allCategories(),
   });
   const topProducts = useQuery({
     queryKey: ['top-products', 'products-page'],
@@ -136,6 +153,7 @@ export function ProductsPage({ role }: { role: Role }) {
             prixAchat: 0,
             stockActuel: product.stockActuel,
             seuilAlerte: product.seuilAlerte,
+            categorieId: product.categorieId,
           }
         : emptyProduct,
     );
@@ -149,6 +167,7 @@ export function ProductsPage({ role }: { role: Role }) {
         prixVente: values.prixVente,
         stockActuel: values.stockActuel,
         seuilAlerte: values.seuilAlerte,
+        categorieId: values.categorieId,
       };
       save.mutate(request);
       return;
@@ -257,6 +276,23 @@ export function ProductsPage({ role }: { role: Role }) {
             placeholder="Sans minimum"
             value={minimumPrice}
           />
+          <SelectField
+            className="filter-field"
+            label="Catégorie"
+            name="product-category-filter"
+            value={categoryFilter}
+            onChange={(event) => {
+              setCategoryFilter(event.target.value);
+              setPage(0);
+            }}
+          >
+            <option value="">Toutes les catégories</option>
+            {(categories.data || []).map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.libelle}
+              </option>
+            ))}
+          </SelectField>
           <FormattedNumberField
             label="Prix maximum"
             decimal
@@ -329,6 +365,7 @@ export function ProductsPage({ role }: { role: Role }) {
           }
           headers={[
             'PRODUIT',
+            'CATÉGORIE',
             'PRIX DE VENTE',
             ...(admin ? ['CMUP', 'MARGE'] : []),
             'STOCK',
@@ -341,6 +378,7 @@ export function ProductsPage({ role }: { role: Role }) {
                 <strong>{product.nom}</strong>
                 <small className="table-subline">{product.description}</small>
               </td>
+              <td>{product.categorieLibelle}</td>
               <td className="right mono">{money(product.prixVente)}</td>
               {admin && (
                 <>
@@ -409,6 +447,7 @@ export function ProductsPage({ role }: { role: Role }) {
           <form className="editor-form" onSubmit={submit} noValidate>
             <Field
               label="Nom"
+              required
               {...form.register('nom')}
               error={form.formState.errors.nom?.message}
             />
@@ -417,12 +456,19 @@ export function ProductsPage({ role }: { role: Role }) {
               {...form.register('description')}
               error={form.formState.errors.description?.message}
             />
+            <CategoryField
+              value={form.watch('categorieId')}
+              onChange={(value) => form.setValue('categorieId', value, { shouldValidate: true })}
+              error={form.formState.errors.categorieId?.message}
+              admin={admin}
+            />
             <NumberField
               control={form.control}
               label="Prix de vente"
               min={0.01}
               step={0.01}
               decimal
+              required
               name="prixVente"
               error={form.formState.errors.prixVente?.message}
             />
@@ -444,6 +490,7 @@ export function ProductsPage({ role }: { role: Role }) {
               name="stockActuel"
               min={0}
               step={1}
+              required
               error={form.formState.errors.stockActuel?.message}
             />
             <NumberField
@@ -452,6 +499,7 @@ export function ProductsPage({ role }: { role: Role }) {
               name="seuilAlerte"
               min={0}
               step={1}
+              required
               error={form.formState.errors.seuilAlerte?.message}
             />
             <Button className="primary" type="submit" disabled={save.isPending}>

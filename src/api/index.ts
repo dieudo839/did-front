@@ -5,6 +5,8 @@ import type {
   AuditJournalEntry,
   AuditPurgeConfiguration,
   AuditPurgeResult,
+  Category,
+  CategoryRequest,
   Delivery,
   DeliveryRequest,
   DeliveryResult,
@@ -23,6 +25,7 @@ import type {
   TopProduct,
   User,
   UserRequest,
+  UserUpdateRequest,
 } from '../types';
 
 interface ProductFilters {
@@ -31,6 +34,7 @@ interface ProductFilters {
   prixMinimum?: string;
   prixMaximum?: string;
   sort?: string;
+  categorieId?: string;
 }
 
 interface ClientFilters {
@@ -83,6 +87,7 @@ export const api = {
         stockMaximum: filters.stockMaximum,
         prixMinimum: filters.prixMinimum,
         prixMaximum: filters.prixMaximum,
+        categorieId: filters.categorieId,
       })}`,
     ),
   createProduct: (body: ProductRequest) =>
@@ -90,6 +95,21 @@ export const api = {
   updateProduct: (id: string, body: ProductUpdateRequest) =>
     request<Product>(`/api/produits/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteProduct: (id: string) => request<void>(`/api/produits/${id}`, { method: 'DELETE' }),
+  categories: (page = 0, libelle = '', size = 20) =>
+    request<Page<Category>>(
+      `/api/categories?${pageParams(page, size, 'libelle,asc', { libelle })}`,
+    ),
+  allCategories: (libelle = '') => {
+    const params = new URLSearchParams({ complet: 'true' });
+    if (libelle) params.set('libelle', libelle);
+    return request<Category[]>(`/api/categories?${params.toString()}`);
+  },
+  category: (id: string) => request<Category>(`/api/categories/${id}`),
+  createCategory: (body: CategoryRequest) =>
+    request<Category>('/api/categories', { method: 'POST', body: JSON.stringify(body) }),
+  updateCategory: (id: string, body: CategoryRequest) =>
+    request<Category>(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteCategory: (id: string) => request<void>(`/api/categories/${id}`, { method: 'DELETE' }),
   createPurchase: (body: PurchaseRequest) =>
     request<Purchase>('/api/achats', { method: 'POST', body: JSON.stringify(body) }),
   purchases: (page: number, filters: Record<string, string | undefined>, sort = 'dateAchat,desc') =>
@@ -122,7 +142,7 @@ export const api = {
     request<Page<User>>(`/api/utilisateurs?${pageParams(page, 10, 'nom,asc', filters)}`),
   createUser: (body: UserRequest) =>
     request<User>('/api/utilisateurs', { method: 'POST', body: JSON.stringify(body) }),
-  updateUser: (id: string, body: UserRequest) =>
+  updateUser: (id: string, body: UserUpdateRequest) =>
     request<User>(`/api/utilisateurs/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   setUserStatus: (id: string, actif: boolean) =>
     request<User>(`/api/utilisateurs/${id}/statut`, {

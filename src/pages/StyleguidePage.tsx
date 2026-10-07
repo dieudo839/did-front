@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Icon } from '../components/Icon';
+import { CategoryField } from '../components/CategoryField';
 import { ActiviteRecente } from './dashboard/ActiviteRecente';
 import { ClassementProduits } from './dashboard/ClassementProduits';
 import { EnteteDePage, SelecteurPeriode } from './dashboard/EnteteDePage';
@@ -42,6 +43,7 @@ const colors = [
 
 export function StyleguidePage() {
   const [modalOpen, setModalOpen] = useState(false);
+  const [categorySample, setCategorySample] = useState('');
 
   return (
     <main className="styleguide">
@@ -97,7 +99,12 @@ export function StyleguidePage() {
         </div>
         <div className="styleguide-grid">
           <div className="styleguide-control-sample">
-            <Field label="Champ" placeholder="Saisir une valeur" help="Texte d’aide facultatif." />
+            <Field
+              label="Champ obligatoire"
+              placeholder="Saisir une valeur"
+              required
+              help="Les champs marqués d’un astérisque doivent être renseignés."
+            />
             <Field label="Avec erreur" error="Vérifiez cette valeur." defaultValue="Exemple" />
             <SelectField label="Sélection" defaultValue="a">
               <option value="a">Option A</option>
@@ -106,6 +113,13 @@ export function StyleguidePage() {
             <CheckField label="Case à cocher" defaultChecked />
             <ToggleField label="Interrupteur" defaultChecked />
           </div>
+        </div>
+      </section>
+
+      <section className="styleguide-section" aria-labelledby="category-picker-heading">
+        <h2 id="category-picker-heading">Sélecteur de catégorie</h2>
+        <div className="styleguide-control-sample">
+          <CategoryField value={categorySample} onChange={setCategorySample} />
         </div>
       </section>
 

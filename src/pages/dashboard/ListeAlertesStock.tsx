@@ -41,7 +41,10 @@ export function ListeAlertesStock({
         <div className="stock-alert-list">
           {products.slice(0, 6).map((product) => (
             <div className="stock-alert-row" key={product.id}>
-              <span className="stock-alert-name">{product.nom}</span>
+              <span className="stock-alert-name">
+                {product.nom}
+                <small>{product.categorieLibelle}</small>
+              </span>
               <span className="stock-alert-quantity">
                 {product.stockActuel} <span>stock</span>
               </span>

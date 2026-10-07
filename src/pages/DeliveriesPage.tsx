@@ -3,6 +3,7 @@ import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import { CategoryField } from '../components/CategoryField';
 import {
   ActionFeedback,
   Button,
@@ -12,6 +13,7 @@ import {
   LoadingState,
   Modal,
   NumberField,
+  RequiredMark,
 } from '../components/ui';
 import { Heading } from '../components/layout';
 import { PhoneField } from '../components/PhoneField';
@@ -102,10 +104,15 @@ function DeliveryProductPicker({
       }}
     >
       <label className="field" htmlFor={id}>
-        <span>Produit</span>
+        <span className="field-label-row">
+          <span>Produit</span>
+          <RequiredMark />
+        </span>
         <input
           id={id}
           type="search"
+          required
+          aria-required="true"
           role="combobox"
           aria-label={`Rechercher un produit pour la ligne ${lineNumber}`}
           aria-autocomplete="list"
@@ -168,7 +175,10 @@ function DeliveryProductPicker({
                 role="option"
                 type="button"
               >
-                <span>{product.nom}</span>
+                <span>
+                  {product.nom}
+                  <small>{product.categorieLibelle}</small>
+                </span>
                 <small>{product.stockActuel} en stock</small>
               </button>
             ))
@@ -195,6 +205,7 @@ const emptyProduct: ProductValues = {
   prixAchat: 0,
   stockActuel: 0,
   seuilAlerte: 5,
+  categorieId: '',
 };
 
 export function DeliveriesPage({ role }: { role: Role }) {
@@ -498,6 +509,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
                 onKeyDown={handleWholesalerKeyDown}
                 placeholder="Chercher par nom…"
                 autoComplete="off"
+                required
                 error={form.formState.errors.grossisteId?.message}
               />
               {wholesalerListOpen && !selectedWholesaler && (
@@ -617,6 +629,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
                       name={`lignes.${index}.quantite`}
                       min={1}
                       step={1}
+                      required
                       error={form.formState.errors.lignes?.[index]?.quantite?.message}
                     />
                     <NumberField
@@ -644,6 +657,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
                             : null;
                         return (
                           <>
+                            <span>Catégorie : {product.categorieLibelle}</span>
                             <span>Stock actuel : {product.stockActuel}</span>
                             {admin && (
                               <>
@@ -688,6 +702,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
                                     min={0.01}
                                     name={`lignes.${index}.nouveauPrixVente`}
                                     step={0.01}
+                                    required
                                   />
                                 )}
                               </>
@@ -766,6 +781,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
           >
             <Field
               label="Nom"
+              required
               {...wholesalerForm.register('nom')}
               error={wholesalerForm.formState.errors.nom?.message}
             />
@@ -811,6 +827,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
           >
             <Field
               label="Nom"
+              required
               {...productForm.register('nom')}
               error={productForm.formState.errors.nom?.message}
             />
@@ -819,6 +836,14 @@ export function DeliveriesPage({ role }: { role: Role }) {
               {...productForm.register('description')}
               error={productForm.formState.errors.description?.message}
             />
+            <CategoryField
+              value={productForm.watch('categorieId')}
+              onChange={(value) =>
+                productForm.setValue('categorieId', value, { shouldValidate: true })
+              }
+              error={productForm.formState.errors.categorieId?.message}
+              admin
+            />
             <NumberField
               control={productForm.control}
               label="Prix de vente"
@@ -826,6 +851,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
               min={0.01}
               step={0.01}
               decimal
+              required
               error={productForm.formState.errors.prixVente?.message}
             />
             <NumberField
@@ -844,6 +870,7 @@ export function DeliveriesPage({ role }: { role: Role }) {
               name="seuilAlerte"
               min={0}
               step={1}
+              required
               error={productForm.formState.errors.seuilAlerte?.message}
             />
             <Button className="primary" type="submit" disabled={createProduct.isPending}>

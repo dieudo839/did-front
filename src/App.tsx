@@ -6,6 +6,7 @@ import { api } from './api';
 import { GlobalLoader } from './components/GlobalLoader';
 import { Shell } from './components/layout';
 import { CheckoutPage } from './pages/CheckoutPage';
+import { CategoriesPage } from './pages/CategoriesPage';
 import { AuditJournalPage } from './pages/AuditJournalPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -76,6 +77,16 @@ function App() {
                   />
                   <Route path="/caisse" element={<CheckoutPage />} />
                   <Route path="/clients" element={<ClientsPage />} />
+                  <Route
+                    path="/categories"
+                    element={
+                      session.utilisateur.role === 'ADMIN' ? (
+                        <CategoriesPage />
+                      ) : (
+                        <Navigate to="/" replace />
+                      )
+                    }
+                  />
                   <Route
                     path="/arrivages"
                     element={<DeliveriesPage role={session.utilisateur.role} />}

@@ -38,6 +38,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) 
         <form onSubmit={submit} noValidate>
           <Field
             label="Nom d’utilisateur"
+            required
             autoComplete="username"
             {...form.register('identifiant')}
             error={form.formState.errors.identifiant?.message}
@@ -46,6 +47,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) 
             <Field
               id="login-password"
               label="Mot de passe"
+              required
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               {...form.register('motDePasse')}

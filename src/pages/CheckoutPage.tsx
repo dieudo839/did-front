@@ -35,6 +35,7 @@ export function CheckoutPage() {
   const [search, setSearch] = useState('');
   const [productPage, setProductPage] = useState(0);
   const [productPageSize, setProductPageSize] = useState(5);
+  const [categoryId, setCategoryId] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -46,8 +47,15 @@ export function CheckoutPage() {
   } | null>(null);
   const [clientModal, setClientModal] = useState(false);
   const productsQuery = useQuery({
-    queryKey: ['products', 'checkout', search, productPage, productPageSize],
-    queryFn: () => api.products(productPage, search, productPageSize),
+    queryKey: ['products', 'checkout', search, productPage, productPageSize, categoryId],
+    queryFn: () =>
+      api.products(productPage, search, productPageSize, false, {
+        categorieId: categoryId || undefined,
+      }),
+  });
+  const categoriesQuery = useQuery({
+    queryKey: ['categories', 'all'],
+    queryFn: () => api.allCategories(),
   });
   const clientsQuery = useQuery({
     queryKey: ['clients', clientSearch],
@@ -251,6 +259,39 @@ export function CheckoutPage() {
               placeholder="Nom du produit… (F2)"
               autoComplete="off"
             />
+            {categoriesQuery.data && categoriesQuery.data.length > 0 && (
+              <div
+                className="checkout-category-filter"
+                role="group"
+                aria-label="Filtrer par catégorie"
+              >
+                <button
+                  className={!categoryId ? 'active' : ''}
+                  type="button"
+                  aria-pressed={!categoryId}
+                  onClick={() => {
+                    setCategoryId('');
+                    setProductPage(0);
+                  }}
+                >
+                  Toutes
+                </button>
+                {categoriesQuery.data.map((category) => (
+                  <button
+                    key={category.id}
+                    className={categoryId === category.id ? 'active' : ''}
+                    type="button"
+                    aria-pressed={categoryId === category.id}
+                    onClick={() => {
+                      setCategoryId(category.id);
+                      setProductPage(0);
+                    }}
+                  >
+                    {category.libelle}
+                  </button>
+                ))}
+              </div>
+            )}
             {productsQuery.isLoading ? (
               <LoadingState label="Recherche dans le rayon…" />
             ) : productsQuery.error ? (
@@ -267,7 +308,9 @@ export function CheckoutPage() {
                   >
                     <span>
                       {product.nom}
-                      <small>{product.stockActuel} en stock</small>
+                      <small>
+                        {product.categorieLibelle} · {product.stockActuel} en stock
+                      </small>
                     </span>
                     <b>{money(product.prixVente)} ＋</b>
                   </button>
@@ -444,6 +487,7 @@ export function CheckoutPage() {
                         min={1}
                         max={product?.stockActuel}
                         step={1}
+                        required
                         name={`lignes.${index}.quantite`}
                         error={form.formState.errors.lignes?.[index]?.quantite?.message}
                       />
@@ -496,6 +540,7 @@ export function CheckoutPage() {
           >
             <Field
               label="Nom"
+              required
               {...clientCreate.register('nom')}
               error={clientCreate.formState.errors.nom?.message}
             />
