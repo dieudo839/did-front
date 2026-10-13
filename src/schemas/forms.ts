@@ -12,6 +12,14 @@ const positiveQuantity = z
   .int('Saisissez un nombre entier.')
   .positive('La quantité doit être supérieure à zéro.');
 
+const telephoneSchema = z
+  .string()
+  .transform((value) => value.trim().replace(/[ .()\-]/g, ''))
+  .refine((value) => value === '' || /^\+[1-9][0-9]{7,14}$/.test(value), {
+    message:
+      "Le numéro de téléphone doit contenir uniquement des chiffres, avec l'indicatif du pays (ex. +22670000001)",
+  });
+
 export const loginSchema = z.object({
   identifiant: z.string().trim().min(1, 'Saisissez votre nom d’utilisateur.'),
   motDePasse: z.string().min(1, 'Saisissez votre mot de passe.'),
@@ -33,7 +41,7 @@ export const userSchema = z.object({
   nom: z.string().trim().min(1, 'Saisissez le nom.').max(100),
   prenom: z.string().trim().min(1, 'Saisissez le prénom.').max(100),
   matricule: z.string().trim().min(1, 'Saisissez le matricule.').max(50),
-  telephone: z.string().max(30),
+  telephone: telephoneSchema,
   sexe: z.enum(['M', 'F'], { error: 'Choisissez le sexe.' }),
   dateNaissance: z
     .string()
@@ -103,7 +111,7 @@ export const profileSchema = z.object({
   nom: z.string().trim().min(1, 'Saisissez le nom.').max(100),
   prenom: z.string().trim().min(1, 'Saisissez le prénom.').max(100),
   matricule: z.string().trim().min(1, 'Saisissez le matricule.').max(50),
-  telephone: z.string().max(30),
+  telephone: telephoneSchema,
   sexe: z.enum(['M', 'F'], { error: 'Choisissez le sexe.' }),
   dateNaissance: z
     .string()
@@ -115,12 +123,12 @@ export const profileSchema = z.object({
 export const clientSchema = z.object({
   nom: z.string().trim().min(1, 'Saisissez le nom.').max(100),
   prenom: z.string().max(100),
-  telephone: z.string().max(30),
+  telephone: telephoneSchema,
 });
 
 export const wholesalerSchema = z.object({
   nom: z.string().trim().min(1, 'Saisissez le nom.').max(150),
-  telephone: z.string().max(30),
+  telephone: telephoneSchema,
   adresse: z.string().max(255),
 });
 

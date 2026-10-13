@@ -111,6 +111,7 @@ export const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(function
   const [country, setCountry] = useState(() => parsePhone(value).country);
   const [countrySearch, setCountrySearch] = useState<string | null>(null);
   const nationalNumber = parsePhone(value).nationalNumber;
+  const nationalNumberMaxLength = Math.max(0, 15 - (country.dialCode.length - 1));
 
   useEffect(() => {
     if (value) {
@@ -148,7 +149,9 @@ export const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(function
               if (selected) {
                 setCountry(selected);
                 setCountrySearch(null);
-                onChange(nationalNumber ? `${selected.dialCode}${nationalNumber}` : '');
+                const maxDigits = 15 - (selected.dialCode.length - 1);
+                const digits = nationalNumber.slice(0, maxDigits);
+                onChange(digits ? `${selected.dialCode}${digits}` : '');
               }
             }}
           />
@@ -168,7 +171,8 @@ export const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(function
             id={phoneInputId}
             name={name}
             type="tel"
-            inputMode="tel"
+            inputMode="numeric"
+            maxLength={nationalNumberMaxLength}
             autoComplete="tel-national"
             placeholder="Numéro sans indicatif"
             value={nationalNumber}
@@ -184,13 +188,17 @@ export const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(function
                 : undefined;
 
               if (pastedCountry) {
-                const digits = enteredValue.slice(pastedCountry.dialCode.length).replace(/\D/g, '');
+                const maxDigits = 15 - (pastedCountry.dialCode.length - 1);
+                const digits = enteredValue
+                  .slice(pastedCountry.dialCode.length)
+                  .replace(/\D/g, '')
+                  .slice(0, maxDigits);
                 setCountry(pastedCountry);
                 onChange(digits ? `${pastedCountry.dialCode}${digits}` : '');
                 return;
               }
 
-              const digits = enteredValue.replace(/\D/g, '');
+              const digits = enteredValue.replace(/\D/g, '').slice(0, nationalNumberMaxLength);
               onChange(digits ? `${country.dialCode}${digits}` : '');
             }}
           />
